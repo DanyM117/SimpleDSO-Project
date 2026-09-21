@@ -1,0 +1,28 @@
+name: DevSecOps pipeline
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  sast_and_sca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      name: Checkout
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install ruff bandit safety
+      - name: Execute linter
+        run: |
+          ruff check . --select E9,F63,F7,F82 --statistics
+      - name: Execute SAST
+        run: |
+          bandit -r . -ll -ii
+      - name: Execute SCA
+        run: |
+          safety check -r requirements.txt
