@@ -39,18 +39,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: build docker image
-        run: |
-          docker build -t simpledso:latest .
-      - name: Run trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'simpledso:latest'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -60,7 +48,18 @@ jobs:
       - name: ECR login
         uses: aws-actions/amazon-ecr-login@v2
         id: login-ecr
-      - name: build image and push
+      - name: Build Docker Image
         run: |
           docker build -t 104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-repo:latest .
+      - name: Run trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-repo:latest'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+      - name: Push Image to ECR
+        run: |
           docker push 104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-repo:latest
