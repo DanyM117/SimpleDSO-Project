@@ -30,7 +30,7 @@ jobs:
           bandit -r . -ll -ii
       - name: Execute SCA
         run: |
-          safety check -r requirements.txt
+          safety scan -r requirements.txt
 
   build_and_scan_image:
     runs-on: ubuntu-latest
