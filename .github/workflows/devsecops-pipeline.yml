@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install ruff bandit safety
+          pip install ruff bandit pip-audit
       - name: Execute linter
         run: |
           ruff check . --select E9,F63,F7,F82 --statistics
