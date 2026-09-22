@@ -44,7 +44,6 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::104091534720:role/github-role-ecr
           aws-region: us-east-1
-          audience: sts.amazonaws.com
       - name: ECR login
         uses: aws-actions/amazon-ecr-login@v2
         id: login-ecr
