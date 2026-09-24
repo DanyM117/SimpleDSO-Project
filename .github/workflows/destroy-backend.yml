@@ -1,0 +1,78 @@
+name: "Terraform Destroy Backend (Manual)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Escribe "DESTROY" para confirmar la eliminacion'
+        required: true
+        default: ''
+
+permissions:
+  id-token: write  # Necesario para OIDC con AWS
+  contents: read
+
+jobs:
+  destroy:
+    name: "Destroy Backend Infrastructure"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm_destroy == 'DESTROY' }}
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Autenticación con AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: 1. Conectar al backend remoto existente
+        run: |
+          set -euo pipefail
+          
+          # Leemos los valores del tfvars para saber a qué bucket conectarnos
+          AWS_REGION=$(grep -E '^aws_region[[:space:]]*=' terraform.tfvars | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')
+          PROJECT_PREFIX=$(grep -E '^project_prefix[[:space:]]*=' terraform.tfvars | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')
+          
+          # Obtenemos el Account ID de AWS actual para armar el nombre exacto
+          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          BUCKET_NAME="${PROJECT_PREFIX}-tfstate-${ACCOUNT_ID}"
+          DYNAMO_TABLE="${PROJECT_PREFIX}-tfstate-lock"
+
+          echo "Conectando al backend remoto en S3: $BUCKET_NAME..."
+          terraform init \
+            -backend-config="bucket=${BUCKET_NAME}" \
+            -backend-config="key=backend-bootstrap/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${DYNAMO_TABLE}" \
+            -backend-config="encrypt=true"
+
+      - name: 2. Migrar estado a LOCAL y vaciar S3
+        run: |
+          set -euo pipefail
+
+          echo "Migrando el estado de S3 a la máquina local..."
+          # Al inicializar con backend=false y -force-copy, copia el tfstate a ./terraform.tfstate local
+          terraform init -backend=false -force-copy
+
+          echo "Extrayendo nombre del bucket para vaciarlo..."
+          BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+
+          echo "Vaciando versiones de objetos en S3..."
+          # Borra todas las versiones y marcadores de borrado para que S3 no bloquee el destroy
+          aws s3api delete-objects \
+            --bucket "$BUCKET_NAME" \
+            --delete "$(aws s3api list-object-versions \
+              --bucket "$BUCKET_NAME" \
+              --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
+              --output json)" || true
+
+      - name: 3. Destruir infraestructura
+        run: |
+          set -euo pipefail
+          terraform destroy -var-file="terraform.tfvars" -auto-approve
