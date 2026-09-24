@@ -12,3 +12,8 @@ output "aws_region" {
   description = "Backend s3 region"
   value = var.aws_region
 }
+
+output "aws_sns_topic_bucket" {
+  description = "Name of the sns topic created"
+  value = aws_sns_topic.bucket_notifications.name
+}
