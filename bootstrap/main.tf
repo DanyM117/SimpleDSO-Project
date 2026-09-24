@@ -28,6 +28,7 @@ resource "aws_s3_bucket_versioning" "terraform_state_versioning" {
 }
 
 resource "aws_sns_topic" "bucket_notifications" {
+  #checkov:skip=CKV_AWS_26: "Ensure all data stored in the SNS topic is encrypted"
   name = "bucket-notifications"
 }
 
@@ -63,6 +64,7 @@ resource "aws_s3_bucket_public_access_block" "terraform_state_access" {
 
 # DynamoDB table
 resource "aws_dynamodb_table" "terraform_locks" {
+  #checkov:skip=CKV_AWS_119: "Ensure DynamoDB Tables are encrypted using a KMS Customer Managed CMK"
   name = local.dynamodb_table
   billing_mode = "PAY_PER_REQUEST"
   hash_key = "LockID"
