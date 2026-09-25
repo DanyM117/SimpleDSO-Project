@@ -32,6 +32,38 @@ resource "aws_sns_topic" "bucket_notifications" {
   name = "bucket-notifications"
 }
 
+data "aws_iam_policy_document" "sns_topic_policy" {
+  statement {
+    effect  = "Allow"
+    actions = ["sns:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    resources = [aws_sns_topic.bucket_notifications.arn]
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.terraform_state.arn]
+    }
+    
+    # Opcional pero recomendado: Restringir por cuenta
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "default" {
+  arn    = aws_sns_topic.bucket_notifications.arn
+  policy = data.aws_iam_policy_document.sns_topic_policy.json
+}
+
 resource "aws_s3_bucket_notification" "bucket_notification" {
   bucket = aws_s3_bucket.terraform_state.id
 
@@ -40,6 +72,8 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
     events        = ["s3:ObjectCreated:*"]
     filter_prefix = "logs/"
   }
+  # ESTA LÍNEA ES CRÍTICA PARA EVITAR LA CONDICIÓN DE CARRERA
+  depends_on = [aws_sns_topic_policy.default]
 }
 
 # SSE-S3 Encryption
