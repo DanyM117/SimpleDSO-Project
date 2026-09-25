@@ -11,7 +11,7 @@ if ! cd $BACKEND_DIR ; then
     exit 1
 fi
 
-[[ ! -f ./backend.tf ]] && { echo "[!] backend.tf fule not found. Creating..." ; touch backend.tf && echo "terraform { backend "'"s3"'" {} }" > backend.tf ; }
+[[ ! -f ./backend.tf ]] && { echo "[!] backend.tf fule not found. Creating..." ; touch backend.tf ; }
 
 echo "[*] Backend found. Initializing terraform without it"
 if ! terraform init -backend=false; then
