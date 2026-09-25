@@ -70,6 +70,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
       - name: Deploy remote s3 backend tftstate
         run: |
+          chmod 755 ./scripts/terraform/migrate_state_s3.sh
           ./scripts/terraform/migrate_state_s3.sh
       - name: Push Image to ECR
         run: |
