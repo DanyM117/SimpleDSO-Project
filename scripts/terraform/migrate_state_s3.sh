@@ -5,8 +5,8 @@ BACKEND_DIR="bootstrap"
 TFVARS_FILE="terraform.tfvars"
 
 echo "[*] Changing to bootstarp migration direcory: ${BACKEND_DIR}"
-[[ ! -d ../../"$BACKEND_DIR" ]] && { echo "[X] Backend directory not found in root repo directory [X] : " ; realpath ../../"$BACKEND_DIR" exit 1 ; }
-if ! cd ../../$BACKEND_DIR ; then
+[[ ! -d "$BACKEND_DIR" ]] && { echo "[X] Backend directory not found in root repo directory [X] : " ; realpath "$BACKEND_DIR" exit 1 ; }
+if ! cd $BACKEND_DIR ; then
     echo "[X] Unknown error changing to ${BACKEND_DIR}"
     exit 1
 fi
