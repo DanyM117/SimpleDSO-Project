@@ -14,7 +14,7 @@ fi
 [[ ! -f ./backend.tf ]] && { echo "[!] backend.tf fule not found. Creating..." ; touch backend.tf && echo "terraform { backend "'"s3"'" {} }" > backend.tf ; }
 
 echo "[*] Backend found. Initializing terraform without it"
-if ! terraform init -backend=false; then
+if ! terraform init ; then
     echo "[X] Unexpected error while initializing terraform"
     exit 1    
 fi
