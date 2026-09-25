@@ -1,7 +1,7 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  bucket_name = "${var.project_prefix}-tfstate-${data.aws_caller_identity.current.account_id}"
+  bucket_name = lower("${var.project_prefix}-tfstate-${data.aws_caller_identity.current.account_id}")
   dynamodb_table = "${var.project_prefix}-tfstate-lock"
 }
 
