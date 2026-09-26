@@ -37,8 +37,8 @@ jobs:
       - name: run terraform infra deployment
         run: |  
           terraform init \
-          -backend-config="bucket=${TF_BUCKET}"
-          -backend-config="dynamodb_table=${TF_DYNAMODB}"
+          -backend-config="bucket=${TF_BUCKET}" \
+          -backend-config="dynamodb_table=${TF_DYNAMODB}" \
           -backend-config="region=${TF_REGION}"
       - name: Terraform validate
         run: |
