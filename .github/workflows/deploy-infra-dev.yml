@@ -33,7 +33,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::104091534720:role/github-role-ecr
-          aws-region: "$TF_REGION"
+          aws-region: "${TF_REGION}"
       - name: run terraform infra deployment
         run: |  
           terraform init \
