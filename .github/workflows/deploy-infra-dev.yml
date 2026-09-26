@@ -1,11 +1,7 @@
 name: simpledso-infra
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "envs/dev/**"
-      - "modules/**"
+  workflow_dispatch:
 
 concurrency:
   group: deploy-infra-dev
