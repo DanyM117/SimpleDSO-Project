@@ -30,7 +30,7 @@ jobs:
         with:
           terraform_version: "1.5.0"
       - name: OIDC AWS Login
-        uses: aws-actions@configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::104091534720:role/github-role-ecr
           aws-region: $TF_REGION
