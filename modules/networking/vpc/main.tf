@@ -15,6 +15,7 @@ module "aws_vpc" {
 
     enable_nat_gateway = true
     single_nat_gateway = var.environment == "prod" ? false : true
+    one_nat_gateway_per_az = var.environment == "prod" ? true : false
 
     create_database_subnet_group = true
     create_database_subnet_route_table = true
@@ -24,6 +25,12 @@ module "aws_vpc" {
         "kubernetes.io/role/internal-elb" = 1
         "Tier" = "Private-App"
     }
+
+    private_subnet_tags = {
+        "kubernetes.io/role/internal-elb" = 1
+        "Tier"                            = "Private-App"
+    }
+
     database_subnet_tags = {
         "Tier" = "Private-Data"
     }
