@@ -1,8 +1,7 @@
 name: DevSecOps pipeline
 
 on:
-  push:
-    branches: ["main"]
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -72,6 +71,6 @@ jobs:
         run: |
           chmod 755 ./scripts/terraform/migrate_state_s3.sh
           ./scripts/terraform/migrate_state_s3.sh
-      - name: Push Image to ECR
-        run: |
-          docker push 104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-repo:latest
+#      - name: Push Image to ECR
+#        run: |
+#          docker push 104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-repo:latest
