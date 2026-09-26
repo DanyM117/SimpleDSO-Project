@@ -33,13 +33,13 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::104091534720:role/github-role-ecr
-          aws-region: ${env.TF_REGION}
+          aws-region: ${{env.TF_REGION}}
       - name: run terraform infra deployment
         run: |  
           terraform init \
-          -backend-config="bucket=${env.TF_BUCKET}"
-          -backend-config="dynamodb_table=${env.TF_DYNAMODB}"
-          -backend-config="region=${env.TF_REGION}"
+          -backend-config="bucket=${TF_BUCKET}"
+          -backend-config="dynamodb_table=${TF_DYNAMODB}"
+          -backend-config="region=${TF_REGION}"
       - name: Terraform validate
         run: |
           terraform validate
