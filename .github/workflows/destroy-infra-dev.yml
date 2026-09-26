@@ -1,0 +1,59 @@
+name: Destroy Dev Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destruction:
+        description: 'Escribe "DESTROY" para confirmar la eliminación de la VPC de dev'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-infra-dev
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  destroy-infra:
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    # Válvula de seguridad para evitar ejecuciones accidentales
+    if: github.event.inputs.confirm_destruction == 'DESTROY'
+    
+    defaults:
+      run:
+        working-directory: ./envs/dev/
+        
+    env:
+      TF_BUCKET: "${{ vars.TF_BUCKET }}"
+      TF_REGION: "${{ vars.TF_REGION }}"
+      TF_DYNAMODB: "${{ vars.TF_DYNAMODB }}"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::104091534720:role/github-role-ecr
+          aws-region: ${{ env.TF_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${TF_BUCKET}" \
+            -backend-config="dynamodb_table=${TF_DYNAMODB}" \
+            -backend-config="region=${TF_REGION}"
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve
