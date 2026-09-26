@@ -32,6 +32,7 @@ jobs:
       TF_BUCKET: "${{ vars.TF_BUCKET }}"
       TF_REGION: "${{ vars.TF_REGION }}"
       TF_DYNAMODB: "${{ vars.TF_DYNAMODB }}"
+      TF_ROLE: "${{vars.TF_ROLE}}"
 
     steps:
       - name: Checkout Code

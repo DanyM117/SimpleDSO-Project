@@ -15,16 +15,18 @@ permissions:
 jobs:
   destroy_backend_s3:
     runs-on: ubuntu-latest
+    environment: dev
     if: github.event.inputs.confirm_destruction == 'DESTROY'
     env:
-      AWS_REGION: "us-east-1"
+      AWS_REGION: "${{vars.TF_REGION}}"
+      TF_ROLE: "${{ vars.TF_ROLE }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Get aws role OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::104091534720:role/github-role-ecr
+          role-to-assume: ${{env.TF_ROLE}}
           aws-region: ${{ env.AWS_REGION }}
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
