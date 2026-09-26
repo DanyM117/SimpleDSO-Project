@@ -19,9 +19,9 @@ jobs:
       run:
         working-directory: ./envs/dev/
     env:
-      TF_BUCKET: ${{ vars.TF_BUCKET }}
-      TF_REGION: ${{ vars.TF_REGION }}
-      TF_DYNAMODB: ${{ vars.TF_DYNAMODB }}
+      TF_BUCKET: "${{ vars.TF_BUCKET }}"
+      TF_REGION: "${{ vars.TF_REGION }}"
+      TF_DYNAMODB: "${{ vars.TF_DYNAMODB }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
