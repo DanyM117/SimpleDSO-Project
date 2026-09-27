@@ -22,7 +22,7 @@ module "aws_vpc" {
     create_database_internet_gateway_route = false
 
     public_subnet_tags = {
-        "kubernetes.io/role/internal-elb" = 1
+        "kubernetes.io/role/elb" = 1
         "Tier" = "Private-App"
     }
 
