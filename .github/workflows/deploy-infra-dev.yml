@@ -48,6 +48,7 @@ jobs:
         with:
           scan-type: 'config'
           scan-ref: 'envs/dev'
+          skip-dirs: '.terraform'
           trivyignores: 'envs/dev/.trivyignore'
           hide-progress: true
           format: 'sarif'

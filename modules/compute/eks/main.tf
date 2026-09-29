@@ -5,6 +5,15 @@ module "eks_aws" {
     name = var.eks_name
     kubernetes_version = "1.33"
 
+    # Habilitar cifrado de secretos de Kubernetes con AWS KMS
+    create_kms_key = true
+    cluster_encryption_config = {
+        resources = ["secrets"]
+    }
+
+    # Habilitar observabilidad y auditoría del Control Plane
+    cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
     addons = {
         coredns = {}
         eks-pod-identity-agent = {
