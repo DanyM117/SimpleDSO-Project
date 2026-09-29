@@ -21,6 +21,11 @@ module "aws_vpc" {
     create_database_subnet_route_table = true
     create_database_internet_gateway_route = false
 
+    # Activar VPC Flow Logs
+    enable_flow_log                      = true
+    create_flow_log_cloudwatch_iam_role  = true
+    create_flow_log_cloudwatch_log_group = true
+
     public_subnet_tags = {
         "kubernetes.io/role/elb" = 1
         "Tier" = "Private-App"
