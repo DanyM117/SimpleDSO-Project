@@ -39,7 +39,7 @@ jobs:
           role-to-assume: ${{env.TF_ROLE}}
           aws-region: ${{env.TF_REGION}}
       - name: Run trivy in scan IaC mode
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'config'
           hide-progres: true
