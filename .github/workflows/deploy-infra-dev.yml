@@ -10,14 +10,12 @@ concurrency:
 permissions:
   id-token: write
   contents: read
+  security-events: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     environment: dev
-    permissions:
-      contents: read
-      security-events: write
     defaults:
       run:
         working-directory: ./envs/dev/
