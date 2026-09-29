@@ -28,40 +28,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.5.0"
+
       - name: OIDC AWS Login
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{env.TF_ROLE}}
-          aws-region: ${{env.TF_REGION}}
-      - name: Run trivy in scan IaC mode
-        uses: aquasecurity/trivy-action@master
+          role-to-assume: ${{ env.TF_ROLE }}
+          aws-region: ${{ env.TF_REGION }}
+
+      # Paso 1: Resolver módulos localmente en envs/dev/ sin conectar al backend
+      - name: Terraform Local Init (Dependency Resolution)
+        run: terraform init -backend=false
+
+      # Paso 2: Escanear el directorio envs/dev ya inicializado
+      - name: Run Trivy IaC Scan
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'config'
-          hide-progres: true
+          scan-ref: 'envs/dev'
+          hide-progress: true
           format: 'sarif'
           output: 'trivy-results.sarif'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
-      - name: Upload trivy IaC scan to security codeql table
+
+      # Paso 3: Cargar el reporte a GitHub Advanced Security (CodeQL)
+      - name: Upload Trivy IaC scan SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
-      - name: run terraform infra deployment
+
+      # Paso 4: Inicialización real conectando a S3 + DynamoDB
+      - name: Terraform Init Remote Backend
         run: |  
-          terraform init \
-          -backend-config="bucket=${TF_BUCKET}" \
-          -backend-config="dynamodb_table=${TF_DYNAMODB}" \
-          -backend-config="region=${TF_REGION}"
-      - name: Terraform validate
-        run: |
-          terraform validate
-      - name: Terraform plan
-        run: |
-          terraform plan -out=tfplan
-      - name: Terraform apply
-        run: |
-          terraform apply -auto-approve tfplan
+          terraform init -reconfigure \
+            -backend-config="bucket=${TF_BUCKET}" \
+            -backend-config="dynamodb_table=${TF_DYNAMODB}" \
+            -backend-config="region=${TF_REGION}"
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply tfplan
