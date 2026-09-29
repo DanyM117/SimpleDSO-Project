@@ -21,7 +21,7 @@ module "eks_aws" {
     endpoint_public_access = true
     enable_cluster_creator_admin_permissions = true
 
-    vpc_id = var.vpc_id
+    vpc_id = var.vpc_id_main
     subnet_ids = var.private_subnets_ids
     control_plane_subnet_ids = var.private_subnets_ids
 
