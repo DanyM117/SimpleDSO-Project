@@ -48,6 +48,7 @@ jobs:
         with:
           scan-type: 'config'
           scan-ref: 'envs/dev'
+          trivyignores: 'envs/dev/.trivyignores'
           hide-progress: true
           format: 'sarif'
           output: 'trivy-results.sarif'
