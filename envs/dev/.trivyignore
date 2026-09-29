@@ -1,4 +1,10 @@
 # Excepción controlada: Nodos EKS requieren Egress hacia 0.0.0.0/0 
 # para alcanzar ECR y CloudWatch a través del NAT Gateway.
-# El aislamiento se mantiene ubicando los nodos en subredes privadas.
 AVD-AWS-0104
+
+# Excepción de Operatividad: El entorno Dev utiliza GitHub-hosted runners.
+# Se requiere el endpoint público habilitado para permitir la comunicación
+# de CI/CD y la administración local vía kubectl sin una VPN dedicada.
+# La seguridad se apoya en la capa de autenticación AWS IAM.
+AVD-AWS-0040
+AVD-AWS-0041
