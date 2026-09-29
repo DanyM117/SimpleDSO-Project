@@ -40,5 +40,3 @@ variable "db_subnets" {
 
 variable "eks-name" { type = string }
 
-variable "cluster-name" { type = string }
-
