@@ -44,7 +44,7 @@ jobs:
 
       # Paso 2: Escanear el directorio envs/dev ya inicializado
       - name: Run Trivy IaC Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'config'
           scan-ref: 'envs/dev'
