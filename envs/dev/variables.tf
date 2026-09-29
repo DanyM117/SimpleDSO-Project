@@ -37,3 +37,8 @@ variable "db_subnets" {
   description = "Default private db subnets"
   type = list(string)
 }
+
+variable "eks-name" { type = string }
+
+variable "cluster-name" { type = string }
+

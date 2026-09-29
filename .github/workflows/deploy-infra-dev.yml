@@ -15,6 +15,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     environment: dev
+    permissions:
+      contents: read
+      security-events: write
     defaults:
       run:
         working-directory: ./envs/dev/
@@ -35,6 +38,20 @@ jobs:
         with:
           role-to-assume: ${{env.TF_ROLE}}
           aws-region: ${{env.TF_REGION}}
+      - name: Run trivy in scan IaC mode
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: 'config'
+          hide-progres: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+      - name: Upload trivy IaC scan to security codeql table
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: 'trivy-results.sarif'
       - name: run terraform infra deployment
         run: |  
           terraform init \
