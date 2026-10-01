@@ -29,10 +29,10 @@ jobs:
         working-directory: ./envs/dev/
         
     env:
-      TF_BUCKET: "${{ vars.TF_BUCKET }}"
-      TF_REGION: "${{ vars.TF_REGION }}"
-      TF_DYNAMODB: "${{ vars.TF_DYNAMODB }}"
-      TF_ROLE: "${{vars.TF_ROLE}}"
+      TF_BUCKET: "${{ vars.TF_STATE_BUCKET }}"
+      TF_REGION: "${{ vars.AWS_REGION }}"
+      TF_DYNAMODB: "${{ vars.DYNAMODB_TABLE }}"
+      TF_ROLE: "${{secrets.AWS_ROLE_ARN}}"
 
     steps:
       - name: Checkout Code
