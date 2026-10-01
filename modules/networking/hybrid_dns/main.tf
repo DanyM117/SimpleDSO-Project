@@ -4,11 +4,12 @@ locals {
     var.erp_target == "onpremise" ? var.onprem_ip : ""
   )
 
-  create_record = var.erp_target != "none" && local.target_ip != ""
+  # Se determina el count a partir de variables conocidas en el plan
+  create_record = var.erp_target == "cloud" || (var.erp_target == "onpremise" && var.onprem_ip != "")
   fqdn          = var.record_name != "" ? "${var.record_name}.${var.domain_name}" : var.domain_name
 }
 
-# Zona Privada en Route 53
+# 1. Zona Privada en Route 53
 resource "aws_route53_zone" "private" {
   name    = var.domain_name
   comment = "Private hosted zone para enrutamiento hibrido ERPNext"
@@ -24,7 +25,7 @@ resource "aws_route53_zone" "private" {
   }
 }
 
-# Registro A Condicional
+# 2. Registro A Condicional
 resource "aws_route53_record" "erp_endpoint" {
   count = local.create_record ? 1 : 0
 

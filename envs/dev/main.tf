@@ -35,15 +35,13 @@ module "erp_ec2" {
 module "hybrid_dns" {
   source = "../../modules/networking/hybrid_dns"
 
-  vpc_id      = module.core_vpc.vpc_id
-  aws_region  = var.aws_region
-  environment = var.environment
-
-  domain_name = "erp.internal"
-  record_name = "api" # Resolverá hacia api.erp.internal
-
+  vpc_id           = module.core_vpc.vpc_id
+  aws_region       = var.aws_region
+  environment      = var.environment
+  domain_name      = "erp.internal"
+  record_name      = "api"
   erp_target       = var.erp_target
-  cloud_private_ip = var.erp_target == "cloud" ? module.erp_ec2[0].private_ip : ""
+  cloud_private_ip = try(module.erp_ec2[0].private_ip, "")
   onprem_ip        = var.onprem_erp_ip
 }
 
