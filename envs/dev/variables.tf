@@ -40,3 +40,10 @@ variable "db_subnets" {
 
 variable "eks-name" { type = string }
 
+variable "ec2-instance-name" { type = string }
+
+variable "key_pair_name" { type = string }
+
+variable "erp_target" { type = string }
+
+variable "onprem_erp_ip" { type = string }

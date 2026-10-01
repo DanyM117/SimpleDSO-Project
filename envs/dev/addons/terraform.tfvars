@@ -1,0 +1,6 @@
+aws_region                  = "us-east-1"
+environment                 = "dev"
+state_bucket_name           = "simpledso-infra-tfstate-104091534720"
+tailscale_oauth_secret_name = "dev/tailscale/oauth"
+tailscale_chart_version     = "1.74.0"
+eso_chart_version           = "0.14.2"

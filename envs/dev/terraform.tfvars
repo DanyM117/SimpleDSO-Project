@@ -6,6 +6,10 @@ vpc_cidr = "10.0.0.0/16"
 #EKS
 eks-name = "simpledso-eks-cluster"
 
+#EC2
+ec2-instance-name = "simpledso-instance"
+
+
 
 azs = [ "us-east-1a", "us-east-1b" ]
 

@@ -4,7 +4,7 @@ module "eks_aws" {
 
     # Nombres de variables corregidos
     cluster_name    = var.eks_name
-    cluster_version = "1.31"
+    cluster_version = "1.33"
 
     # Habilitar cifrado de secretos de Kubernetes con AWS KMS
     create_kms_key = true

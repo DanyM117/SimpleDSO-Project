@@ -1,0 +1,258 @@
+name: "Phase 2 - Core Infrastructure & Kubernetes Addons"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'modules/**'
+      - 'envs/dev/**'
+      - 'k8s/**'
+      - '.github/workflows/infra-phase2.yml'
+  workflow_dispatch:
+    inputs:
+      erp_target:
+        description: 'Destino de persistencia de ERPNext'
+        required: true
+        default: 'cloud'
+        type: choice
+        options:
+          - cloud
+          - onpremise
+          - none
+      onprem_ip:
+        description: 'IP Tailscale del servidor fisico (si erp_target == onpremise)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  id-token: write   # Obligatorio para federacion OIDC contra AWS STS
+  contents: read    # Acceso de lectura al codigo fuente
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}
+  DYNAMODB_TABLE: ${{ vars.DYNAMODB_TABLE || 'SimpleDSo-infra-tfstate-lock' }}
+  ERP_TARGET: ${{ github.event.inputs.erp_target || 'cloud' }}
+  ONPREM_IP: ${{ github.event.inputs.onprem_ip || '' }}
+
+jobs:
+  # =========================================================================
+  # 1. ANALISIS ESTATICO DE SEGURIDAD (SHIFT-LEFT)
+  # =========================================================================
+  iac-security-scan:
+    name: "IaC Security Scan (Trivy)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy IaC Scanner
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          trivyignores: 'envs/dev/.trivyignore'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+
+  # =========================================================================
+  # 2. DESPLIEGUE INFRAESTRUCTURA BASE (TERRAFORM CORE)
+  # =========================================================================
+  terraform-core:
+    name: "Terraform Apply (Core)"
+    needs: [iac-security-scan]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: envs/dev
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=dev/core/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ env.DYNAMODB_TABLE }}" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Apply
+        env:
+          TF_VAR_key_pair_name: ${{ secrets.EC2_KEY_PAIR_NAME }}
+          TF_VAR_erp_target: ${{ env.ERP_TARGET }}
+          TF_VAR_onprem_erp_ip: ${{ env.ONPREM_IP }}
+        run: |
+          terraform apply -auto-approve \
+            -var-file="terraform.tfvars" \
+            -var="key_pair_name=${TF_VAR_key_pair_name}" \
+            -var="erp_target=${TF_VAR_erp_target}" \
+            -var="onprem_erp_ip=${TF_VAR_onprem_erp_ip}"
+
+  # =========================================================================
+  # 3. PROVISIÓN DE SECRETOS OAUTH EN AWS SECRETS MANAGER
+  # =========================================================================
+  sync-ts-credentials:
+    name: "Sync Tailscale OAuth"
+    needs: [terraform-core]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create or Update AWS Secret
+        run: |
+          SECRET_NAME="dev/tailscale/oauth"
+          SECRET_PAYLOAD="{\"client_id\":\"${{ secrets.TS_CLIENT_ID }}\",\"client_secret\":\"${{ secrets.TS_CLIENT_SECRET }}\"}"
+          
+          if aws secretsmanager describe-secret --secret-id "$SECRET_NAME" >/dev/null 2>&1; then
+            echo "[*] Actualizando valor de secreto existente: $SECRET_NAME"
+            aws secretsmanager put-secret-value \
+              --secret-id "$SECRET_NAME" \
+              --secret-string "$SECRET_PAYLOAD"
+          else
+            echo "[*] Creando nuevo secreto cifrado: $SECRET_NAME"
+            aws secretsmanager create-secret \
+              --name "$SECRET_NAME" \
+              --description "Tailscale Operator OAuth credentials managed by GitHub Actions" \
+              --secret-string "$SECRET_PAYLOAD"
+          fi
+
+  # =========================================================================
+  # 4. DESPLIEGUE DE CONTROLADORES DE KUBERNETES (ADDONS)
+  # =========================================================================
+  terraform-addons:
+    name: "Terraform Apply (Addons)"
+    needs: [sync-ts-credentials]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: envs/dev/addons
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=dev/addons/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ env.DYNAMODB_TABLE }}" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform Apply
+        run: |
+          terraform apply -auto-approve \
+            -var-file="terraform.tfvars" \
+            -var="state_bucket_name=${{ env.TF_STATE_BUCKET }}"
+
+  # =========================================================================
+  # 5. RECONCILIACIÓN DE MANIFIESTOS Y PRUEBAS OPERATIVAS (SMOKE TESTS)
+  # =========================================================================
+  k8s-reconciliation:
+    name: "Kubernetes Smoke Tests & CRDs"
+    needs: [terraform-addons]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl CLI
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.31.0'
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name simpledso-eks-cluster \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for Operator Deployments Rollout
+        run: |
+          echo "[*] Verificando rollout de External Secrets Operator..."
+          kubectl rollout status deployment/external-secrets \
+            -n external-secrets \
+            --timeout=180s
+
+          echo "[*] Verificando rollout de Tailscale Operator..."
+          kubectl rollout status deployment/tailscale-operator \
+            -n tailscale \
+            --timeout=180s
+
+      - name: Apply Base External Secrets Manifests
+        run: |
+          kubectl apply -f k8s/base/external-secrets/cluster-secret-store.yaml
+
+          # Obtener dinámicamente el ARN del secreto de RDS y aplicar ExternalSecret
+          RDS_SECRET_ARN=$(aws secretsmanager list-secrets \
+            --filter Key="name",Values="simpledso-dev-agent-db" \
+            --query "SecretList[0].Name" \
+            --output text)
+
+          sed -i "s|simpledso-dev-agent-db-xxxx|${RDS_SECRET_ARN}|g" \
+            k8s/base/external-secrets/agent-db-external-secret.yaml
+
+          kubectl apply -f k8s/base/external-secrets/agent-db-external-secret.yaml
+
+      - name: Validate Reconciliation Status
+        run: |
+          echo "[*] Verificando estado de sincronizacion del ExternalSecret..."
+          for i in {1..30}; do
+            STATUS=$(kubectl get externalsecret agent-db-credentials -n default -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+            if [ "$STATUS" == "True" ]; then
+              echo "[OK] Secret sincronizado correctamente con AWS Secrets Manager."
+              break
+            fi
+            echo "Esperando sincronizacion... ($i/30)"
+            sleep 5
+          done
+
+          if [ "$STATUS" != "True" ]; then
+            echo "[X] Fallo la reconciliacion del secreto de base de datos."
+            kubectl describe externalsecret agent-db-credentials -n default
+            exit 1
+          fi
+
+          echo "[*] Validando existencia de llaves en el Secret generado:"
+          kubectl get secret agent-postgres-secret -n default -o jsonpath='{.data}' | grep -q "DB_PASSWORD"
+          echo "[OK] Objeto Secret validado en el namespace default."
