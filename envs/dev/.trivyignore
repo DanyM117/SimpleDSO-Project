@@ -13,3 +13,4 @@ AVD-AWS-0041
 # en desarrollo para permitir ciclos de vida efímeros y ejecución de terraform destroy.
 # En producción, deletion_protection se evalúa como true.
 AVD-AWS-0177
+AVD-AWS-0078
