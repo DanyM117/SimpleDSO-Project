@@ -1,10 +1,15 @@
 data "aws_ami" "amazon_linux_arm" {
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["137112412989"] # AWS Amazon Linux AMI Owner ID
 
   filter {
     name   = "name"
-    values = ["al2023-ami-kernel-*-arm64"]
+    values = ["al2023-ami-2023.*-kernel-*-arm64"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["arm64"]
   }
 
   filter {
