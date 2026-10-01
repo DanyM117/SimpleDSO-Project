@@ -74,7 +74,14 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -input=false -out=tfplan
+        env:
+          TF_VAR_key_pair_name: ${{ secrets.EC2_KEY_PAIR_NAME }}
+          TF_VAR_erp_target: "cloud"
+        run: |
+          terraform plan \
+            -input=false \
+            -var-file="terraform.tfvars" \
+            -out=tfplan
 
       - name: Terraform Apply
         run: terraform apply -input=false -auto-approve tfplan
