@@ -4,7 +4,7 @@ data "aws_ami" "amazon_linux_arm" {
 
   filter {
     name   = "name"
-    values = ["al2023-ami-kernel-*-arm64"] # Filtro crucial para asegurar arquitectura ARM
+    values = ["al2023-ami-kernel-*-arm64"]
   }
 
   filter {
@@ -47,21 +47,28 @@ module "ec2_security_group_to" {
 }
 
 module "ec2_erp" {
-    source = "terraform-aws-modules/ec2-instance/aws"
-    version = "6.4.1"
-    
-    name = var.ec2_name
+  source  = "terraform-aws-modules/ec2-instance/aws"
+  version = "~> 5.7"
 
-    ami = data.aws_ami.amazon_linux_arm.id
-    instance_type = "t4g.medium"
-    key_name      = var.key_pair_name
-    monitoring    = true
-    subnet_id     = var.app_subnet_id
+  name                   = var.ec2_name
+  ami                    = data.aws_ami.amazon_linux_arm.id
+  instance_type          = "t4g.medium"
+  key_name               = var.key_pair_name
+  monitoring             = true
+  subnet_id              = var.app_subnet_id
+  vpc_security_group_ids = [module.ec2_security_group_to.security_group_id]
 
-    vpc_security_group_ids = [module.ec2_security_group_to.security_group_id]
-
-    tags = {
-        Terraform   = "true"
-        Environment = var.environment
+  enable_volume_tags = true
+  root_block_device = [
+    {
+      encrypted   = true
+      volume_type = "gp3"
+      volume_size = 40
     }
+  ]
+
+  tags = {
+    Terraform   = "true"
+    Environment = var.environment
+  }
 }
