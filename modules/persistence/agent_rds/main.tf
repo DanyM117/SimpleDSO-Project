@@ -56,24 +56,31 @@ resource "aws_db_instance" "agent_postgres" {
   db_name  = var.db_name
   username = var.db_username
 
-  # Secretless Authentication: AWS genera y gestiona el secreto en Secrets Manager
+  # Secretless Authentication: Credencial maestra administrada por Secrets Manager
   manage_master_user_password = true
+
+  # Corrección AVD-AWS-0176: Habilita autenticación IAM (Zero-Trust)
+  iam_database_authentication_enabled = true
+
+  # Corrección AVD-AWS-0133: Performance Insights activado (7 días sin costo adicional)
+  performance_insights_enabled          = true
+  performance_insights_retention_period = 7
 
   db_subnet_group_name   = var.db_subnet_group_name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   parameter_group_name   = aws_db_parameter_group.postgres_pg.name
 
   publicly_accessible = false
-  multi_az            = false # True para prod
+  multi_az            = false
 
-  # Ventanas de respaldo y retención (cumple directivas de Trivy/Checkov)
-  backup_retention_period   = var.environment == "prod" ? 7 : 1
-  backup_window             = "03:00-04:00"
-  maintenance_window        = "Mon:04:30-Mon:05:30"
+  # Corrección AVD-AWS-0077: Retención mínima de 7 días para respaldos continuos
+  backup_retention_period    = 7
+  backup_window              = "03:00-04:00"
+  maintenance_window         = "Mon:04:30-Mon:05:30"
   auto_minor_version_upgrade = true
-  copy_tags_to_snapshot     = true
-  deletion_protection       = var.environment == "prod" ? true : false
-  skip_final_snapshot       = var.environment == "prod" ? false : true
+  copy_tags_to_snapshot      = true
+  deletion_protection        = var.environment == "prod" ? true : false
+  skip_final_snapshot        = var.environment == "prod" ? false : true
 
   tags = {
     Name        = "${var.project_prefix}-${var.environment}-agent-db"

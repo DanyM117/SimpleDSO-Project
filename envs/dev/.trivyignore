@@ -1,4 +1,4 @@
-# Excepción controlada: Nodos EKS requieren Egress hacia 0.0.0.0/0 
+# Excepción controlada: Nodos EKS requieren Egress hacia 0.0.0.0/0  
 # para alcanzar ECR y CloudWatch a través del NAT Gateway.
 AVD-AWS-0104
 
@@ -8,3 +8,8 @@ AVD-AWS-0104
 # La seguridad se apoya en la capa de autenticación AWS IAM.
 AVD-AWS-0040
 AVD-AWS-0041
+
+# Excepción de Operatividad (Dev): Deletion Protection se mantiene deshabilitado
+# en desarrollo para permitir ciclos de vida efímeros y ejecución de terraform destroy.
+# En producción, deletion_protection se evalúa como true.
+AVD-AWS-0177
