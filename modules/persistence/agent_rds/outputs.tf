@@ -24,6 +24,6 @@ output "db_security_group_id" {
 }
 
 output "master_user_secret_arn" {
-  description = "ARN del secreto administrado en AWS Secrets Manager con las credenciales maestras"
-  value       = aws_db_instance.agent_postgres.master_user_secret[0].secret_arn
+  description = "ARN del secreto determinista en AWS Secrets Manager"
+  value       = aws_secretsmanager_secret.db_credentials.arn
 }
