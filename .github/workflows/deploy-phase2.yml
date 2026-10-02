@@ -59,7 +59,7 @@ jobs:
           bandit -r app.py -ll
 
       - name: Run Aqua Trivy (IaC Misconfigurations)
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'config'
           scan-ref: '.'
