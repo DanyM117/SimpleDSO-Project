@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_destruction:
-        description: 'Escribe "DESTROY" para confirmar la eliminación de la VPC de dev'
+        description: 'Escribe "DESTROY" para confirmar la eliminación total de Dev (Core + Addons)'
         required: true
         type: string
 
@@ -18,21 +18,17 @@ permissions:
 
 jobs:
   destroy-infra:
+    name: "Destroy Full Dev Stack"
     runs-on: ubuntu-latest
     environment: dev
     
-    # Válvula de seguridad para evitar ejecuciones accidentales
+    # Válvula de seguridad contra ejecuciones accidentales
     if: github.event.inputs.confirm_destruction == 'DESTROY'
-    
-    defaults:
-      run:
-        working-directory: ./envs/dev/
-        
+
     env:
-      TF_BUCKET: "${{ vars.TF_STATE_BUCKET }}"
-      TF_REGION: "${{ vars.AWS_REGION }}"
-      TF_DYNAMODB: "${{ vars.DYNAMODB_TABLE }}"
-      TF_ROLE: "${{secrets.AWS_ROLE_ARN}}"
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}
+      DYNAMODB_TABLE: ${{ vars.DYNAMODB_TABLE || 'SimpleDSo-infra-tfstate-lock' }}
 
     steps:
       - name: Checkout Code
@@ -41,21 +37,62 @@ jobs:
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::104091534720:role/github-role-ecr
-          aws-region: ${{ env.TF_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.5"
+          terraform_version: 1.9.5
           terraform_wrapper: false
 
-      - name: Terraform Init
-        run: |
-          terraform init \
-            -backend-config="bucket=${TF_BUCKET}" \
-            -backend-config="dynamodb_table=${TF_DYNAMODB}" \
-            -backend-config="region=${TF_REGION}"
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.31.0"
 
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve
+      - name: Configure Kubeconfig Context
+        run: |
+          echo "[*] Obteniendo contexto del clúster EKS..."
+          aws eks update-kubeconfig \
+            --name simpledso-eks-cluster \
+            --region ${{ env.AWS_REGION }} || true
+
+      - name: 1. Delete K8s Custom Resources & Secrets
+        run: |
+          echo "[*] Purgando recursos de External Secrets..."
+          kubectl delete -f k8s/base/external-secrets/ --ignore-not-found --timeout=60s || true
+          kubectl delete secret agent-postgres-secret -n default --ignore-not-found || true
+
+      - name: 2. Destroy Kubernetes Addons (Tailscale & ESO)
+        working-directory: envs/dev/addons
+        run: |
+          echo "[*] Inicializando backend de Addons..."
+          terraform init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="dynamodb_table=${DYNAMODB_TABLE}" \
+            -backend-config="region=${AWS_REGION}"
+          
+          echo "[*] Destruyendo releases de Helm y namespaces de Addons..."
+          terraform destroy -auto-approve -var-file="terraform.tfvars" || true
+
+      - name: 3. Destroy Core Infrastructure (EKS, RDS, EC2, VPC)
+        working-directory: envs/dev
+        run: |
+          echo "[*] Inicializando backend de Core..."
+          terraform init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="dynamodb_table=${DYNAMODB_TABLE}" \
+            -backend-config="region=${AWS_REGION}"
+
+          echo "[*] Destruyendo infraestructura base..."
+          terraform destroy -auto-approve -var-file="terraform.tfvars"
+
+      - name: 4. Purge Ephemeral Secrets in Secrets Manager
+        run: |
+          echo "[*] Eliminando secreto OAuth de Tailscale..."
+          aws secretsmanager delete-secret \
+            --secret-id "dev/tailscale/oauth" \
+            --force-delete-without-recovery \
+            --region ${{ env.AWS_REGION }} || true
