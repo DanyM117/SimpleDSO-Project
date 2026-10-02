@@ -24,3 +24,9 @@ AWS-0132
 # Excepción de respaldo si el SNS Topic no utiliza KMS CMK dedicado
 AVD-AWS-0095
 AWS-0095s
+
+# Excepción Arquitectónica (Bootstrap): El SNS Topic utiliza la llave administrada 
+# por AWS (alias/aws/sns) en lugar de una CMK dedicada para optimizar costes 
+# y evitar dependencias de KMS en el backend de estado.
+AVD-AWS-0136
+AWS-0136

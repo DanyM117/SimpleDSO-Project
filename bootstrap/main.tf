@@ -29,6 +29,7 @@ resource "aws_s3_bucket_versioning" "terraform_state_versioning" {
 
 resource "aws_sns_topic" "bucket_notifications" {
   #checkov:skip=CKV_AWS_26: "Ensure all data stored in the SNS topic is encrypted"
+  #trivy:ignore:AVD-AWS-0136
   name = "bucket-notifications"
   kms_master_key_id = "alias/aws/sns"
 }
