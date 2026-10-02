@@ -41,7 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
     env:
-      TF_ROLE: "${{vars.TF_ROLE}}"
+      TF_ROLE: "${{secrets.AWS_ROLE_ARNs}}"
+      AWS_REGION: "${{vars.AWS_REGION}}"
     needs:
       - sast_and_sca
     steps:
@@ -50,8 +51,8 @@ jobs:
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{vars.TF_ROLE}}
-          aws-region: us-east-1
+          role-to-assume: ${{env.TF_ROLE}}
+          aws-region: ${{env.AWS_REGION}}
       - name: Setup terraform
         uses: hashicorp/setup-terraform@v4
         with:
