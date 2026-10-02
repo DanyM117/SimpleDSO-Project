@@ -236,7 +236,8 @@ jobs:
           kubectl rollout status deployment/external-secrets -n external-secrets --timeout=180s
 
           echo "[*] Esperando a que Tailscale Operator este listo..."
-          kubectl rollout status deployment/tailscale-operator -n tailscale --timeout=180s
+          kubectl rollout status deployment/operator -n tailscale --timeout=180s
+        
 
       - name: Deploy ClusterSecretStore & ExternalSecret
         env:
