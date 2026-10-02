@@ -19,14 +19,14 @@ jobs:
     if: github.event.inputs.confirm_destruction == 'DESTROY'
     env:
       AWS_REGION: "${{vars.AWS_REGION}}"
-      TF_ROLE: "${{ vars.AWS_ROLE_ARN }}"
+      ROLE_TO: "${{ vars.AWS_ROLE_ARN }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Get aws role OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{env.TF_ROLE}}
+          role-to-assume: ${{env.ROLE_TO}}
           aws-region: ${{ env.AWS_REGION }}
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4

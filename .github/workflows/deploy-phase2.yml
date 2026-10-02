@@ -1,14 +1,6 @@
 name: "DevSecOps Pipeline - Phase 2 Infrastructure & Addons"
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'modules/**'
-      - 'envs/dev/**'
-      - 'k8s/**'
-      - '.github/workflows/deploy-phase2.yml'
   workflow_dispatch:
     inputs:
       erp_target:
