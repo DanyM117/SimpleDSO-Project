@@ -14,3 +14,13 @@ AVD-AWS-0041
 # En producción, deletion_protection se evalúa como true.
 AVD-AWS-0177
 AVD-AWS-0078
+
+# Excepción Arquitectónica (Bootstrap): El bucket de backend de estado Terraform 
+# utiliza SSE-S3 (AES256) para evitar dependencia circular con llaves KMS CMK 
+# durante la inicialización y migración del estado.
+AVD-AWS-0132
+AWS-0132
+
+# Excepción de respaldo si el SNS Topic no utiliza KMS CMK dedicado
+AVD-AWS-0095
+AWS-0095s
