@@ -3,7 +3,9 @@ FROM python:3.12-alpine3.21 AS builder
 
 WORKDIR /build
 
-RUN apk add --no-cache gcc musl-dev libpq-dev
+# Actualizar paquetes base e instalar dependencias de compilación
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache gcc musl-dev libpq-dev
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
@@ -11,8 +13,9 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # Stage 2: Hardened Runtime Container
 FROM python:3.12-alpine3.21
 
-# Instalar exclusivamente la librería de enlace en tiempo de ejecución
-RUN apk add --no-cache libpq && \
+# Actualizar librerías de sistema (mitiga OpenSSL, musl y zlib) e instalar libpq
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache libpq && \
     addgroup -g 1000 -S appgroup && \
     adduser -u 1000 -S appuser -G appgroup
 
@@ -30,5 +33,4 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
 USER appuser
 EXPOSE 5000
 
-# Gunicorn en ejecución con 2 workers (adecuado para 1 vCPU / t4g.small)
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "30", "--access-logfile", "-", "app:app"]
