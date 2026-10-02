@@ -24,7 +24,7 @@ variable "tailscale_oauth_secret_name" {
 variable "tailscale_chart_version" {
   description = "Versión del Helm chart de Tailscale Operator"
   type        = string
-  default     = "1.74.0"
+  default     = "1.90.5"
 }
 
 variable "eso_chart_version" {
