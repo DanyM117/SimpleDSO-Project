@@ -36,6 +36,7 @@ env:
   DYNAMODB_TABLE: ${{ vars.DYNAMODB_TABLE || 'SimpleDSo-infra-tfstate-lock' }}
   ERP_TARGET: ${{ github.event.inputs.erp_target || 'cloud' }}
   ONPREM_IP: ${{ github.event.inputs.onprem_ip || '' }}
+  TF_ROLE: ${{ secrets.AWS_ROLE_ARN }}
 
 jobs:
   # =========================================================================
@@ -87,7 +88,7 @@ jobs:
       - name: Authenticate to AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.TF_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
 
