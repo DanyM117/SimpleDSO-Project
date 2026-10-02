@@ -1,5 +1,6 @@
 import os
 import socket
+
 import psycopg2
 from flask import Flask, jsonify
 
@@ -34,7 +35,7 @@ def ready():
             cur.execute("SELECT 1;")
         conn.close()
         return jsonify({"status": "ready", "database": "connected"}), 200
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return jsonify({"status": "unhealthy", "error": str(exc)}), 503
 
 
@@ -59,5 +60,5 @@ def ping_erp():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port)  # nosec B104
