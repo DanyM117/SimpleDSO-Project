@@ -90,6 +90,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Habilitar emulación multiarquitectura en este runner
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Authenticate to AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
