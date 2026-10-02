@@ -47,7 +47,6 @@ module "hybrid_dns" {
 
 module "agent_rds" {
   source = "../../modules/persistence/agent_rds"
-
   environment            = var.environment
   project_prefix         = "simpledso"
   vpc_id                 = module.core_vpc.vpc_id
@@ -55,7 +54,7 @@ module "agent_rds" {
   eks_node_sg_id         = module.core_eks.eks_node_sg_id
   db_name                = "agent_core"
   db_username            = "agent_admin"
-  instance_class         = "db.t4g.micro"
+  instance_class         = "db.t4g.small" # Actualizado de db.t4g.micro para evitar InsufficientDBInstanceCapacity
   allocated_storage      = 20
   max_allocated_storage  = 50
 }
