@@ -1,0 +1,160 @@
+name: "DevSecOps Pipeline - Phase 3 Application Delivery"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'k8s/apps/**'
+      - '.github/workflows/deploy-phase3.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-phase3-app
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: "us-east-1"
+  ECR_REPOSITORY: "simpledso-agent"
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  static-analysis:
+    name: "SAST & SCA Analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Analysis Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff bandit pip-audit
+
+      - name: Linting (Ruff)
+        run: ruff check .
+
+      - name: SAST Code Analysis (Bandit)
+        run: bandit -r app.py -ll
+
+      - name: SCA Dependency Audit (pip-audit)
+        run: pip-audit -r requirements.txt
+
+  build-and-scan:
+    name: "Build ARM64 & Trivy Scan"
+    needs: [static-analysis]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ARM64 Local Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          load: true
+          tags: ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+      - name: Run Aqua Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: "HIGH,CRITICAL"
+
+  ecr-push:
+    name: "ECR Push via OIDC"
+    needs: [build-and-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push Multi-Platform Image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+  k8s-deploy:
+    name: "Deploy to EKS Cluster"
+    needs: [ecr-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.31.0"
+
+      - name: Generate Kubeconfig Context
+        run: |
+          aws eks update-kubeconfig --name simpledso-eks-cluster --region ${{ env.AWS_REGION }}
+
+      - name: Deploy Workload via Kustomize
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          
+          cd k8s/apps/agent-core
+          kustomize edit set image 104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-agent:latest=${REGISTRY}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          kubectl apply -k .
+
+      - name: Verify Rollout Status
+        run: |
+          kubectl rollout status deployment/agent-core -n default --timeout=180s
+
+      - name: Smoke Tests (Database & DNS)
+        run: |
+          echo "[*] Verificando logs del pod..."
+          kubectl logs -n default deployment/agent-core --tail=30
+          
+          echo "[*] Ejecutando sonda interna /ready..."
+          kubectl exec -n default deployment/agent-core -- wget -qO- http://127.0.0.1:5000/ready
+          
+          echo "[*] Ejecutando validación DNS hacia ERP..."
+          kubectl exec -n default deployment/agent-core -- wget -qO- http://127.0.0.1:5000/api/v1/erp/ping
