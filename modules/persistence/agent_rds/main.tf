@@ -37,7 +37,29 @@ resource "aws_db_parameter_group" "postgres_pg" {
     ManagedBy   = "Terraform"
   }
 }
+# Generar contraseña segura sin exponerla en tfstate plano
+resource "random_password" "master_password" {
+  length           = 24
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
 
+# Secreto con NOMBRE FIJO y DETERMINISTA
+resource "aws_secretsmanager_secret" "db_credentials" {
+  name                    = "${var.project_prefix}/${var.environment}/agent-db/credentials"
+  recovery_window_in_days = 0 # Permite recrearlo inmediatamente en terraform apply tras un destroy
+}
+
+resource "aws_secretsmanager_secret_version" "db_credentials" {
+  secret_id = aws_secretsmanager_secret.db_credentials.id
+  secret_string = jsonencode({
+    username = var.db_username
+    password = random_password.master_password.result
+    host     = aws_db_instance.agent_postgres.address
+    port     = 5432
+    dbname   = var.db_name
+  })
+}
 # 4. Instancia de Base de Datos RDS PostgreSQL
 resource "aws_db_instance" "agent_postgres" {
   #checkov:skip=CKV_AWS_118: "Ensure that Enhanced Monitoring is enabled" (Dev cost optimization)
@@ -57,7 +79,7 @@ resource "aws_db_instance" "agent_postgres" {
   username = var.db_username
 
   # Secretless Authentication: Credencial maestra administrada por Secrets Manager
-  manage_master_user_password = true
+ # manage_master_user_password = true
 
   # Corrección AVD-AWS-0176: Habilita autenticación IAM (Zero-Trust)
   iam_database_authentication_enabled = true
