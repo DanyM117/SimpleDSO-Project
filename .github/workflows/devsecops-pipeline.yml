@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
     env:
-      TF_ROLE: "${{secrets.AWS_ROLE_ARNs}}"
+      TF_ROLE: "${{secrets.AWS_ROLE_ARN}}"
       AWS_REGION: "${{vars.AWS_REGION}}"
     needs:
       - sast_and_sca
