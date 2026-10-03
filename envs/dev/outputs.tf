@@ -52,3 +52,13 @@ output "agent_service_account_name" {
   description = "ServiceAccount a vincular en los despliegues del Agente"
   value       = module.agent_security.service_account_name
 }
+
+output "route53_zone_id" {
+  description = "ID de la Hosted Zone privada de Route 53"
+  value       = module.hybrid_dns.zone_id
+}
+
+output "eks_node_sg_id" {
+  description = "Security Group ID de los nodos de computo EKS"
+  value       = module.core_eks.eks_node_sg_id
+}

@@ -1,0 +1,5 @@
+aws_region          = "us-east-1"
+environment         = "dev"
+state_bucket_name   = "simpledso-infra-tfstate-104091534720"
+dynamodb_table_name = "SimpleDSo-infra-tfstate-lock"
+ec2_name            = "simpledso-erp-instance"

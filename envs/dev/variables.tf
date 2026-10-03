@@ -57,8 +57,7 @@ variable "key_pair_name" {
 variable "erp_target" {
   description = "Estrategia de persistencia: 'cloud', 'onpremise' o 'none'"
   type        = string
-  default     = "cloud"
-
+  default     = "none"
   validation {
     condition     = contains(["cloud", "onpremise", "none"], var.erp_target)
     error_message = "La variable erp_target debe ser estrictamente 'cloud', 'onpremise' o 'none'."

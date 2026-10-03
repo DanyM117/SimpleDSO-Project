@@ -8,8 +8,19 @@ on:
       - 'requirements.txt'
       - 'Dockerfile'
       - 'k8s/apps/**'
+      - 'envs/dev/erp/**'
       - '.github/workflows/deploy-phase3.yml'
   workflow_dispatch:
+    inputs:
+      erp_target:
+        description: 'Estrategia ERPNext (cloud / onpremise / none)'
+        required: true
+        default: 'cloud'
+        type: choice
+        options:
+          - cloud
+          - onpremise
+          - none
 
 concurrency:
   group: deploy-phase3-app
@@ -20,9 +31,12 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: "us-east-1"
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}
+  DYNAMODB_TABLE: ${{ vars.DYNAMODB_TABLE || 'SimpleDSo-infra-tfstate-lock' }}
   ECR_REPOSITORY: "simpledso-agent"
   IMAGE_TAG: ${{ github.sha }}
+  ERP_TARGET: ${{ github.event.inputs.erp_target || 'cloud' }}
 
 jobs:
   static-analysis:
@@ -31,23 +45,16 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install Analysis Tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff bandit pip-audit
-
+        run: pip install ruff bandit pip-audit
       - name: Linting (Ruff)
         run: ruff check .
-
       - name: SAST Code Analysis (Bandit)
         run: bandit -r app.py -ll
-
       - name: SCA Dependency Audit (pip-audit)
         run: pip-audit -r requirements.txt
 
@@ -58,13 +65,10 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Build ARM64 Local Image
         uses: docker/build-push-action@v6
         with:
@@ -72,7 +76,6 @@ jobs:
           platforms: linux/arm64
           load: true
           tags: ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-
       - name: Run Aqua Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -89,25 +92,19 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      # Habilitar emulación multiarquitectura en este runner
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Authenticate to AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
-
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
       - name: Push Multi-Platform Image to ECR
         uses: docker/build-push-action@v6
         with:
@@ -118,50 +115,81 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
-  k8s-deploy:
-    name: "Deploy to EKS Cluster"
-    needs: [ecr-push]
+  # Aprovisionamiento condicional de la EC2 en Fase 3
+  deploy-erp-cloud:
+    name: "Deploy ERP Cloud (EC2 & DNS)"
+    if: github.event.inputs.erp_target == 'cloud' || (github.event_name == 'push' && env.ERP_TARGET == 'cloud')
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: envs/dev/erp
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Authenticate to AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+      - name: Initialize Backend
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=dev/erp/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ env.DYNAMODB_TABLE }}" \
+            -backend-config="encrypt=true"
+      - name: Apply ERP EC2 & Route53 Record
+        env:
+          TF_VAR_key_pair_name: ${{ secrets.EC2_KEY_PAIR_NAME }}
+        run: |
+          terraform apply -auto-approve \
+            -var-file="terraform.tfvars" \
+            -var="state_bucket_name=${{ env.TF_STATE_BUCKET }}" \
+            -var="key_pair_name=${TF_VAR_key_pair_name}"
 
+  k8s-deploy:
+    name: "Deploy to EKS Cluster"
+    needs: [ecr-push]
+    # Espera a que el ERP esté aprovisionado si aplica
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Authenticate to AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
         with:
           version: "v1.31.0"
-
       - name: Generate Kubeconfig Context
         run: |
           aws eks update-kubeconfig --name simpledso-eks-cluster --region ${{ env.AWS_REGION }}
-
       - name: Deploy Workload via Kustomize
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           REGISTRY="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
-          
           cd k8s/apps/agent-core
           kustomize edit set image 104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-agent:latest=${REGISTRY}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           kubectl apply -k .
-
       - name: Verify Rollout Status
         run: |
           kubectl rollout status deployment/agent-core -n default --timeout=180s
-
       - name: Smoke Tests (Database & DNS)
         run: |
           echo "[*] Verificando logs del pod..."
           kubectl logs -n default deployment/agent-core --tail=30
-          
           echo "[*] Ejecutando sonda interna /ready..."
           kubectl exec -n default deployment/agent-core -- wget -qO- http://127.0.0.1:5000/ready
-          
-          echo "[*] Ejecutando validación DNS hacia ERP..."
+          echo "[*] Ejecutando validacion DNS hacia ERP..."
           kubectl exec -n default deployment/agent-core -- wget -qO- http://127.0.0.1:5000/api/v1/erp/ping

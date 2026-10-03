@@ -93,3 +93,19 @@ jobs:
           else
             echo "[*] El repositorio ECR no contenía imágenes activas."
           fi
+          
+      - name: Teardown ERP Cloud (EC2 & DNS)
+        run: |
+          echo "[*] Inicializando backend de ERP para destruccion..."
+          cd envs/dev/erp
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}" \
+            -backend-config="key=dev/erp/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ vars.DYNAMODB_TABLE || 'SimpleDSo-infra-tfstate-lock' }}" \
+            -backend-config="encrypt=true"
+
+          echo "[*] Destruyendo instancia EC2 y registro DNS..."
+          terraform destroy -auto-approve \
+            -var-file="terraform.tfvars" \
+            -var="state_bucket_name=${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}" || true

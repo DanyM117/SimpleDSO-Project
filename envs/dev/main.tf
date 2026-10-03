@@ -19,18 +19,6 @@ module "core_eks" {
     environment = var.environment
 }
 
-module "erp_ec2" {
-    source = "../../modules/compute/erp_ec2"
-
-    count = var.erp_target == "cloud" ? 1 : 0
-
-    ec2_name = var.ec2-instance-name
-    environment = var.environment
-    app_subnet_id = module.core_vpc.private_app_subnet_ids[0]
-    eks_sg_ids = module.core_eks.eks-node-sg-id
-    key_pair_name = var.key_pair_name # ENV VAR
-    vpc_id_main = module.core_vpc.vpc_id
-}
 
 module "hybrid_dns" {
   source = "../../modules/networking/hybrid_dns"
@@ -40,8 +28,8 @@ module "hybrid_dns" {
   environment      = var.environment
   domain_name      = "erp.internal"
   record_name      = "api"
-  erp_target       = var.erp_target
-  cloud_private_ip = try(module.erp_ec2[0].private_ip, "")
+  erp_target       = var.erp_target == "onpremise" ? "onpremise" : "none"
+  cloud_private_ip = ""
   onprem_ip        = var.onprem_erp_ip
 }
 
