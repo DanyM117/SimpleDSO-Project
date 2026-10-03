@@ -1,17 +1,15 @@
-name: "DevSecOps Pipeline - Phase 3 Application Teardown"
+name: "DevSecOps Pipeline - Phase 3 Application Delivery"
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'app.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'k8s/apps/**'
+      - '.github/workflows/deploy-phase3.yml'
   workflow_dispatch:
-    inputs:
-      confirm_destruction:
-        description: 'Escribe "DESTROY" para confirmar la eliminación del workload del Agente IA'
-        required: true
-        type: string
-      purge_ecr_images:
-        description: 'Purgar todas las imágenes en Amazon ECR (simpledso-agent)'
-        required: true
-        default: false
-        type: boolean
 
 concurrency:
   group: deploy-phase3-app
@@ -22,22 +20,113 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-  CLUSTER_NAME: "simpledso-eks-cluster"
+  AWS_REGION: "us-east-1"
   ECR_REPOSITORY: "simpledso-agent"
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  teardown-application:
-    name: "Teardown K8s Workload & ECR Prune"
+  static-analysis:
+    name: "SAST & SCA Analysis"
     runs-on: ubuntu-latest
-    environment: dev
-    if: github.event.inputs.confirm_destruction == 'DESTROY'
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials via OIDC
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Analysis Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff bandit pip-audit
+
+      - name: Linting (Ruff)
+        run: ruff check .
+
+      - name: SAST Code Analysis (Bandit)
+        run: bandit -r app.py -ll
+
+      - name: SCA Dependency Audit (pip-audit)
+        run: pip-audit -r requirements.txt
+
+  build-and-scan:
+    name: "Build ARM64 & Trivy Scan"
+    needs: [static-analysis]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ARM64 Local Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          load: true
+          tags: ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+      - name: Run Aqua Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: "HIGH,CRITICAL"
+
+  ecr-push:
+    name: "ECR Push via OIDC"
+    needs: [build-and-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Habilitar emulación multiarquitectura en este runner
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate to AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push Multi-Platform Image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+  k8s-deploy:
+    name: "Deploy to EKS Cluster"
+    needs: [ecr-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -51,45 +140,28 @@ jobs:
 
       - name: Generate Kubeconfig Context
         run: |
-          aws eks update-kubeconfig \
-            --name ${{ env.CLUSTER_NAME }} \
-            --region ${{ env.AWS_REGION }}
+          aws eks update-kubeconfig --name simpledso-eks-cluster --region ${{ env.AWS_REGION }}
 
-      - name: Teardown K8s Workload via Kustomize
+      - name: Deploy Workload via Kustomize
         run: |
-          echo "[*] Destruyendo Deployment, Service y ServiceAccount de agent-core..."
-          kubectl delete -k k8s/apps/agent-core/ --ignore-not-found=true --wait=true --timeout=120s
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          
+          cd k8s/apps/agent-core
+          kustomize edit set image 104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-agent:latest=${REGISTRY}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          kubectl apply -k .
 
-      - name: Verify Teardown Completion
+      - name: Verify Rollout Status
         run: |
-          echo "[*] Validando limpieza en namespace default..."
-          if kubectl get pods -n default -l app=agent-core 2>&1 | grep -q "No resources found"; then
-            echo "[OK] No existen pods activos de agent-core."
-          else
-            echo "[-] Forzando eliminación de pods residuales..."
-            kubectl delete pod -n default -l app=agent-core --force --grace-period=0 --ignore-not-found=true
-          fi
+          kubectl rollout status deployment/agent-core -n default --timeout=180s
 
-          kubectl get svc agent-core-svc -n default 2>&1 | grep -q "NotFound" && echo "[OK] Service agent-core-svc eliminado."
-          kubectl get sa agent-core-sa -n default 2>&1 | grep -q "NotFound" && echo "[OK] ServiceAccount agent-core-sa eliminado."
-
-      - name: Prune ECR Images
-        if: github.event.inputs.purge_ecr_images == 'true'
+      - name: Smoke Tests (Database & DNS)
         run: |
-          echo "[*] Verificando imágenes en el repositorio ECR: ${{ env.ECR_REPOSITORY }}..."
-          IMAGE_IDS=$(aws ecr list-images \
-            --repository-name ${{ env.ECR_REPOSITORY }} \
-            --region ${{ env.AWS_REGION }} \
-            --query 'imageIds[*]' \
-            --output json 2>/dev/null || echo "[]")
-
-          if [ "$IMAGE_IDS" != "[]" ] && [ -n "$IMAGE_IDS" ]; then
-            echo "[*] Purgando imágenes y tags..."
-            aws ecr batch-delete-image \
-              --repository-name ${{ env.ECR_REPOSITORY }} \
-              --region ${{ env.AWS_REGION }} \
-              --image-ids "$IMAGE_IDS"
-            echo "[OK] Imágenes eliminadas de ECR."
-          else
-            echo "[*] El repositorio ECR no contenía imágenes activas."
-          fi
+          echo "[*] Verificando logs del pod..."
+          kubectl logs -n default deployment/agent-core --tail=30
+          
+          echo "[*] Ejecutando sonda interna /ready..."
+          kubectl exec -n default deployment/agent-core -- wget -qO- http://127.0.0.1:5000/ready
+          
+          echo "[*] Ejecutando validación DNS hacia ERP..."
+          kubectl exec -n default deployment/agent-core -- wget -qO- http://127.0.0.1:5000/api/v1/erp/ping

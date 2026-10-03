@@ -1,0 +1,95 @@
+name: "DevSecOps Pipeline - Phase 3 Application Teardown"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destruction:
+        description: 'Escribe "DESTROY" para confirmar la eliminación del workload del Agente IA'
+        required: true
+        type: string
+      purge_ecr_images:
+        description: 'Purgar todas las imágenes en Amazon ECR (simpledso-agent)'
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: deploy-phase3-app
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  CLUSTER_NAME: "simpledso-eks-cluster"
+  ECR_REPOSITORY: "simpledso-agent"
+
+jobs:
+  teardown-application:
+    name: "Teardown K8s Workload & ECR Prune"
+    runs-on: ubuntu-latest
+    environment: dev
+    if: github.event.inputs.confirm_destruction == 'DESTROY'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.31.0"
+
+      - name: Generate Kubeconfig Context
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ env.CLUSTER_NAME }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Teardown K8s Workload via Kustomize
+        run: |
+          echo "[*] Destruyendo Deployment, Service y ServiceAccount de agent-core..."
+          kubectl delete -k k8s/apps/agent-core/ --ignore-not-found=true --wait=true --timeout=120s
+
+      - name: Verify Teardown Completion
+        run: |
+          echo "[*] Validando limpieza en namespace default..."
+          if kubectl get pods -n default -l app=agent-core 2>&1 | grep -q "No resources found"; then
+            echo "[OK] No existen pods activos de agent-core."
+          else
+            echo "[-] Forzando eliminación de pods residuales..."
+            kubectl delete pod -n default -l app=agent-core --force --grace-period=0 --ignore-not-found=true
+          fi
+
+          kubectl get svc agent-core-svc -n default 2>&1 | grep -q "NotFound" && echo "[OK] Service agent-core-svc eliminado."
+          kubectl get sa agent-core-sa -n default 2>&1 | grep -q "NotFound" && echo "[OK] ServiceAccount agent-core-sa eliminado."
+
+      - name: Prune ECR Images
+        if: github.event.inputs.purge_ecr_images == 'true'
+        run: |
+          echo "[*] Verificando imágenes en el repositorio ECR: ${{ env.ECR_REPOSITORY }}..."
+          IMAGE_IDS=$(aws ecr list-images \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'imageIds[*]' \
+            --output json 2>/dev/null || echo "[]")
+
+          if [ "$IMAGE_IDS" != "[]" ] && [ -n "$IMAGE_IDS" ]; then
+            echo "[*] Purgando imágenes y tags..."
+            aws ecr batch-delete-image \
+              --repository-name ${{ env.ECR_REPOSITORY }} \
+              --region ${{ env.AWS_REGION }} \
+              --image-ids "$IMAGE_IDS"
+            echo "[OK] Imágenes eliminadas de ECR."
+          else
+            echo "[*] El repositorio ECR no contenía imágenes activas."
+          fi
