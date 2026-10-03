@@ -1,0 +1,491 @@
+Working... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:36
+Run started:2026-10-03 19:27:25.305454+00:00
+
+Test results:
+>> Issue: [B613:trojansource] A Python source file contains bidirectional control characters ('\u202e').
+   Severity: High   Confidence: Medium
+   CWE: CWE-838 (https://cwe.mitre.org/data/definitions/838.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b613_trojansource.html
+   Location: ./venv1/lib/python3.14/site-packages/bandit/plugins/trojansource.py:22:36
+21	     3  	access_level = "user"
+22	     4	    if access_level != 'none‮⁦': # Check if admin ⁩⁦' and access_level != 'user
+23	     5	        print("You are an admin.\n")
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using xmlrpc to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/__init__.py:37:4
+36	    from . import expatreader
+37	    from . import xmlrpc
+38	
+
+--------------------------------------------------
+>> Issue: [B319:blacklist] Using xml.dom.pulldom.parse to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.dom.pulldom.parse with its defusedxml equivalent function or make sure defusedxml.defuse_stdlib() is called
+   Severity: Medium   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b313-b320-xml-bad-pulldom
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/pulldom.py:30:11
+29	        parser.forbid_external = forbid_external
+30	    return _parse(stream_or_string, parser, bufsize)
+31	
+
+--------------------------------------------------
+>> Issue: [B319:blacklist] Using xml.dom.pulldom.parseString to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.dom.pulldom.parseString with its defusedxml equivalent function or make sure defusedxml.defuse_stdlib() is called
+   Severity: Medium   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b313-b320-xml-bad-pulldom
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/pulldom.py:41:11
+40	        parser.forbid_external = forbid_external
+41	    return _parseString(string, parser)
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using ExpatParser to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:18:4
+17	    __origin__ = "xmlrpc.client"
+18	    from xmlrpc.client import ExpatParser
+19	    from xmlrpc import client as xmlrpc_client
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using client to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:19:4
+18	    from xmlrpc.client import ExpatParser
+19	    from xmlrpc import client as xmlrpc_client
+20	    from xmlrpc import server as xmlrpc_server
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using server to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:20:4
+19	    from xmlrpc import client as xmlrpc_client
+20	    from xmlrpc import server as xmlrpc_server
+21	    from xmlrpc.client import gzip_decode as _orig_gzip_decode
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using gzip_decode to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:21:4
+20	    from xmlrpc import server as xmlrpc_server
+21	    from xmlrpc.client import gzip_decode as _orig_gzip_decode
+22	    from xmlrpc.client import GzipDecodedResponse as _OrigGzipDecodedResponse
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using GzipDecodedResponse to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:22:4
+21	    from xmlrpc.client import gzip_decode as _orig_gzip_decode
+22	    from xmlrpc.client import GzipDecodedResponse as _OrigGzipDecodedResponse
+23	else:
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using ExpatParser to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:25:4
+24	    __origin__ = "xmlrpclib"
+25	    from xmlrpclib import ExpatParser
+26	    import xmlrpclib as xmlrpc_client
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using xmlrpclib to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:26:4
+25	    from xmlrpclib import ExpatParser
+26	    import xmlrpclib as xmlrpc_client
+27	
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using gzip_decode to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:29:4
+28	    xmlrpc_server = None
+29	    from xmlrpclib import gzip_decode as _orig_gzip_decode
+30	    from xmlrpclib import GzipDecodedResponse as _OrigGzipDecodedResponse
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using GzipDecodedResponse to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/defusedxml/xmlrpc.py:30:4
+29	    from xmlrpclib import gzip_decode as _orig_gzip_decode
+30	    from xmlrpclib import GzipDecodedResponse as _OrigGzipDecodedResponse
+31	
+
+--------------------------------------------------
+>> Issue: [B604:any_other_function_with_shell_equals_true] Function call with shell=True parameter identified, possible security issue.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b604_any_other_function_with_shell_equals_true.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_internal/commands/completion.py:130:18
+129	            )
+130	            print(BASE_COMPLETION.format(script=script, shell=options.shell))
+131	            return SUCCESS
+
+--------------------------------------------------
+>> Issue: [B602:subprocess_popen_with_shell_equals_true] subprocess call with shell=True identified, security issue.
+   Severity: High   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b602_subprocess_popen_with_shell_equals_true.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_internal/commands/configuration.py:248:12
+247	        try:
+248	            subprocess.check_call(f'{editor} "{fname}"', shell=True)
+249	        except FileNotFoundError as e:
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using xmlrpc.client to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/pip/_internal/commands/search.py:7:0
+6	import textwrap
+7	import xmlrpc.client
+8	from collections import OrderedDict
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using xmlrpc.client to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/pip/_internal/network/xmlrpc.py:5:0
+4	import urllib.parse
+5	import xmlrpc.client
+6	from typing import TYPE_CHECKING
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using _HostType to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/pip/_internal/network/xmlrpc.py:13:4
+12	if TYPE_CHECKING:
+13	    from xmlrpc.client import _HostType, _Marshallable
+14	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_internal/utils/pylock.py:298:14
+297	        raise InstallationError(
+298	            f"Cannot select requirements from pylock file {pylock_path_or_url!r}: {exc}"
+299	        ) from exc
+
+--------------------------------------------------
+>> Issue: [B202:tarfile_unsafe_members] tarfile.extractall used without any validation. Please check and discard dangerous members.
+   Severity: High   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b202_tarfile_unsafe_members.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_internal/utils/unpacking.py:254:12
+253	
+254	            tar.extractall(location, filter=pip_filter)
+255	
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using xmlrpclib to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/distlib/compat.py:41:4
+40	    import httplib
+41	    import xmlrpclib
+42	    import Queue as queue
+
+--------------------------------------------------
+>> Issue: [B411:blacklist] Using xmlrpc.client to parse untrusted XML data is known to be vulnerable to XML attacks. Use defusedxml.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate XML vulnerabilities.
+   Severity: High   Confidence: High
+   CWE: CWE-20 (https://cwe.mitre.org/data/definitions/20.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b411-import-xmlrpclib
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/distlib/compat.py:77:4
+76	    import urllib.request as urllib2
+77	    import xmlrpc.client as xmlrpclib
+78	    import queue
+
+--------------------------------------------------
+>> Issue: [B202:tarfile_unsafe_members] tarfile.extractall used without any validation. Please check and discard dangerous members.
+   Severity: High   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b202_tarfile_unsafe_members.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/distlib/util.py:1307:8
+1306	
+1307	        archive.extractall(dest_dir)
+1308	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/pkg_resources/__init__.py:1714:12
+1713	            code = compile(source, script_filename, 'exec')
+1714	            exec(code, namespace, namespace)
+1715	        else:
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/pkg_resources/__init__.py:1725:12
+1724	            script_code = compile(script_text, script_filename, 'exec')
+1725	            exec(script_code, namespace, namespace)
+1726	
+
+--------------------------------------------------
+>> Issue: [B108:hardcoded_tmp_directory] Probable insecure usage of temp file/directory.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-377 (https://cwe.mitre.org/data/definitions/377.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/platformdirs/unix.py:184:21
+183	        if sys.platform.startswith("openbsd"):
+184	            path = f"/tmp/run/user/{getuid()}"  # noqa: S108
+185	        elif sys.platform.startswith(("freebsd", "netbsd")):
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/pygments/formatters/__init__.py:103:12
+102	        with open(filename, 'rb') as f:
+103	            exec(f.read(), custom_namespace)
+104	        # Retrieve the class `formattername` from that namespace
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/pygments/lexers/__init__.py:154:12
+153	        with open(filename, 'rb') as f:
+154	            exec(f.read(), custom_namespace)
+155	        # Retrieve the class `lexername` from that namespace
+
+--------------------------------------------------
+>> Issue: [B301:blacklist] Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue.
+   Severity: Medium   Confidence: High
+   CWE: CWE-502 (https://cwe.mitre.org/data/definitions/502.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b301-pickle
+   Location: ./venv1/lib/python3.14/site-packages/pip/_vendor/rich/style.py:471:66
+470	        """Get meta information (can not be changed after construction)."""
+471	        return {} if self._meta is None else cast(Dict[str, Any], loads(self._meta))
+472	
+
+--------------------------------------------------
+>> Issue: [B108:hardcoded_tmp_directory] Probable insecure usage of temp file/directory.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-377 (https://cwe.mitre.org/data/definitions/377.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html
+   Location: ./venv1/lib/python3.14/site-packages/platformdirs/unix.py:177:21
+176	        if sys.platform.startswith("openbsd"):
+177	            path = f"/tmp/run/user/{getuid()}"  # ruff:ignore[hardcoded-temp-file]
+178	        elif sys.platform.startswith(("freebsd", "netbsd")):
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: ./venv1/lib/python3.14/site-packages/py_serializable/__init__.py:974:42
+973	                            # Will load any class already loaded assuming fully qualified name
+974	                            self._type_ = eval(f'{mapped_array_type}[{results.get("array_of")}]')
+975	                            self._concrete_type = eval(str(results.get('array_of')))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: ./venv1/lib/python3.14/site-packages/py_serializable/__init__.py:975:50
+974	                            self._type_ = eval(f'{mapped_array_type}[{results.get("array_of")}]')
+975	                            self._concrete_type = eval(str(results.get('array_of')))
+976	                        except NameError:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: ./venv1/lib/python3.14/site-packages/py_serializable/__init__.py:1007:42
+1006	                            # Will load any class already loaded assuming fully qualified name
+1007	                            self._type_ = eval(f'{mapped_array_type}[{results.get("array_of")}]')
+1008	                            self._concrete_type = eval(str(results.get('array_of')))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: ./venv1/lib/python3.14/site-packages/py_serializable/__init__.py:1008:50
+1007	                            self._type_ = eval(f'{mapped_array_type}[{results.get("array_of")}]')
+1008	                            self._concrete_type = eval(str(results.get('array_of')))
+1009	                        except NameError:
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: ./venv1/lib/python3.14/site-packages/pygments/formatters/__init__.py:103:12
+102	        with open(filename, 'rb') as f:
+103	            exec(f.read(), custom_namespace)
+104	        # Retrieve the class `formattername` from that namespace
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/__init__.py:154:12
+153	        with open(filename, 'rb') as f:
+154	            exec(f.read(), custom_namespace)
+155	        # Retrieve the class `lexername` from that namespace
+
+--------------------------------------------------
+>> Issue: [B310:blacklist] Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/_lua_builtins.py:225:12
+224	    def get_newest_version():
+225	        f = urlopen('http://www.lua.org/manual/')
+226	        r = re.compile(r'^<A HREF="(\d\.\d)/">(Lua )?\1</A>')
+
+--------------------------------------------------
+>> Issue: [B310:blacklist] Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/_lua_builtins.py:233:12
+232	    def get_lua_functions(version):
+233	        f = urlopen(f'http://www.lua.org/manual/{version}/')
+234	        r = re.compile(r'^<A HREF="manual.html#pdf-(?!lua|LUA)([^:]+)">\1</A>')
+
+--------------------------------------------------
+>> Issue: [B310:blacklist] Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/_mysql_builtins.py:1297:19
+1296	        # Pull content from lex.h.
+1297	        lex_file = urlopen(LEX_URL).read().decode('utf8', errors='ignore')
+1298	        keywords = parse_lex_keywords(lex_file)
+
+--------------------------------------------------
+>> Issue: [B310:blacklist] Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/_mysql_builtins.py:1303:27
+1302	        # Parse content in item_create.cc.
+1303	        item_create_file = urlopen(ITEM_CREATE_URL).read().decode('utf8', errors='ignore')
+1304	        functions.update(parse_item_create_functions(item_create_file))
+
+--------------------------------------------------
+>> Issue: [B310:blacklist] Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/_php_builtins.py:3299:19
+3298	    def get_php_references():
+3299	        download = urlretrieve(PHP_MANUAL_URL)
+3300	        with tarfile.open(download[0]) as tar:
+
+--------------------------------------------------
+>> Issue: [B202:tarfile_unsafe_members] tarfile.extractall used without any validation. Please check and discard dangerous members.
+   Severity: High   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b202_tarfile_unsafe_members.html
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/_php_builtins.py:3304:16
+3303	            else:
+3304	                tar.extractall()
+3305	        yield from glob.glob(f"{PHP_MANUAL_DIR}{PHP_REFERENCE_GLOB}")
+
+--------------------------------------------------
+>> Issue: [B310:blacklist] Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/_postgres_builtins.py:642:18
+641	    def update_myself():
+642	        content = urlopen(DATATYPES_URL).read().decode('utf-8', errors='ignore')
+643	        data_file = list(content.splitlines())
+
+--------------------------------------------------
+>> Issue: [B310:blacklist] Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-22 (https://cwe.mitre.org/data/definitions/22.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen
+   Location: ./venv1/lib/python3.14/site-packages/pygments/lexers/_postgres_builtins.py:647:18
+646	
+647	        content = urlopen(KEYWORDS_URL).read().decode('utf-8', errors='ignore')
+648	        keywords = parse_keywords(content)
+
+--------------------------------------------------
+>> Issue: [B301:blacklist] Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue.
+   Severity: Medium   Confidence: High
+   CWE: CWE-502 (https://cwe.mitre.org/data/definitions/502.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b301-pickle
+   Location: ./venv1/lib/python3.14/site-packages/rich/style.py:475:66
+474	        """Get meta information (can not be changed after construction)."""
+475	        return {} if self._meta is None else cast(Dict[str, Any], loads(self._meta))
+476	
+
+--------------------------------------------------
+>> Issue: [B108:hardcoded_tmp_directory] Probable insecure usage of temp file/directory.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-377 (https://cwe.mitre.org/data/definitions/377.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html
+   Location: ./venv1/lib/python3.14/site-packages/stevedore/_cache.py:153:39
+152	                os.path.isfile(os.path.join(self._dir, '.disable')),
+153	                sys.executable[0:4] == '/tmp',  # noqa: S108,
+154	            ]
+
+--------------------------------------------------
+>> Issue: [B108:hardcoded_tmp_directory] Probable insecure usage of temp file/directory.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-377 (https://cwe.mitre.org/data/definitions/377.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html
+   Location: ./venv1/lib/python3.14/site-packages/stevedore/tests/test_cache.py:28:50
+27	        """
+28	        with mock.patch.object(sys, 'executable', '/tmp/fake'):
+29	            sot = _cache.Cache()
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 388180
+	Total lines skipped (#nosec): 4
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 22
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 951
+		Medium: 27
+		High: 20
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 2
+		Medium: 29
+		High: 967
+Files skipped (0):
