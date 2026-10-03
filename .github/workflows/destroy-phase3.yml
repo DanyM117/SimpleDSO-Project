@@ -49,6 +49,12 @@ jobs:
         with:
           version: "v1.31.0"
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+          terraform_wrapper: false
+
       - name: Generate Kubeconfig Context
         run: |
           aws eks update-kubeconfig \
@@ -93,19 +99,23 @@ jobs:
           else
             echo "[*] El repositorio ECR no contenía imágenes activas."
           fi
-          
-      - name: Teardown ERP Cloud (EC2 & DNS)
-        run: |
-          echo "[*] Inicializando backend de ERP para destruccion..."
-          cd envs/dev/erp
-          terraform init \
-            -backend-config="bucket=${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}" \
-            -backend-config="key=dev/erp/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ vars.DYNAMODB_TABLE || 'SimpleDSo-infra-tfstate-lock' }}" \
-            -backend-config="encrypt=true"
 
-          echo "[*] Destruyendo instancia EC2 y registro DNS..."
-          terraform destroy -auto-approve \
-            -var-file="terraform.tfvars" \
-            -var="state_bucket_name=${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}" || true
+      - name: Teardown ERP Cloud (EC2 & DNS)
+        working-directory: envs/dev/erp
+        run: |
+          if [ -f "main.tf" ]; then
+            echo "[*] Inicializando backend de ERP para destruccion..."
+            terraform init \
+              -backend-config="bucket=${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}" \
+              -backend-config="key=dev/erp/terraform.tfstate" \
+              -backend-config="region=${{ env.AWS_REGION }}" \
+              -backend-config="dynamodb_table=${{ vars.DYNAMODB_TABLE || 'SimpleDSo-infra-tfstate-lock' }}" \
+              -backend-config="encrypt=true"
+
+            echo "[*] Destruyendo instancia EC2 y registro DNS..."
+            terraform destroy -auto-approve \
+              -var-file="terraform.tfvars" \
+              -var="state_bucket_name=${{ vars.TF_STATE_BUCKET || 'simpledso-infra-tfstate-104091534720' }}" || true
+          else
+            echo "[*] No se encontro definicion de ERP; omitiendo."
+          fi
