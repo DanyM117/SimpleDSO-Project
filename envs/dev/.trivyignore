@@ -30,3 +30,7 @@ AWS-0095s
 # y evitar dependencias de KMS en el backend de estado.
 AVD-AWS-0136
 AWS-0136
+
+# Excepción de desarrollo: Mutabilidad de tags permitida para pruebas locales
+AVD-AWS-0031
+AWS-0031

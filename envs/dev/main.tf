@@ -18,7 +18,8 @@ module "core_eks" {
     private_subnets_ids = module.core_vpc.private_app_subnet_ids
     environment = var.environment
 }
-
+# trivy:ignore:AVD-AWS-0031
+# trivy:ignore:AWS-0031
 resource "aws_ecr_repository" "agent_repo" {
   name                 = "simpledso-agent"
   image_tag_mutability = "MUTABLE"
