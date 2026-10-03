@@ -59,43 +59,41 @@ jobs:
             --name simpledso-eks-cluster \
             --region ${{ env.AWS_REGION }} || true
 
-      - name: 1. Delete K8s Workloads, Custom Resources & Secrets
+      - name: 1. Delete K8s Workloads & Secrets
         run: |
-          echo "[*] Purgando workload de aplicacion (Fase 3)..."
+          echo "[*] Purgando workload de Kubernetes..."
           kubectl delete -k k8s/apps/agent-core/ --ignore-not-found --timeout=60s || true
-
-          echo "[*] Purgando recursos de External Secrets (Fase 2)..."
           kubectl delete -f k8s/base/external-secrets/ --ignore-not-found --timeout=60s || true
           kubectl delete secret agent-postgres-secret -n default --ignore-not-found || true
 
-      - name: 2. Destroy Kubernetes Addons (Tailscale & ESO)
+      - name: 2. Destroy ERP Cloud (Liberar ENI en VPC)
+        working-directory: envs/dev/erp
+        run: |
+          if [ -f "main.tf" ]; then
+            echo "[*] Destruyendo instancia EC2 y DNS de ERP..."
+            terraform init \
+              -backend-config="bucket=${TF_STATE_BUCKET}" \
+              -backend-config="dynamodb_table=${DYNAMODB_TABLE}" \
+              -backend-config="region=${AWS_REGION}"
+            terraform destroy -auto-approve -var-file="terraform.tfvars" -var="state_bucket_name=${TF_STATE_BUCKET}" || true
+          fi
+
+      - name: 3. Destroy Kubernetes Addons (Tailscale & ESO)
         working-directory: envs/dev/addons
         run: |
-          echo "[*] Inicializando backend de Addons..."
+          echo "[*] Destruyendo releases de Helm de Addons..."
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="dynamodb_table=${DYNAMODB_TABLE}" \
             -backend-config="region=${AWS_REGION}"
-          
-          echo "[*] Destruyendo releases de Helm y namespaces de Addons..."
           terraform destroy -auto-approve -var-file="terraform.tfvars" || true
 
-      - name: 3. Destroy Core Infrastructure (EKS, RDS, EC2, VPC)
+      - name: 4. Destroy Core Infrastructure (EKS, RDS, VPC)
         working-directory: envs/dev
         run: |
-          echo "[*] Inicializando backend de Core..."
+          echo "[*] Destruyendo infraestructura base..."
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="dynamodb_table=${DYNAMODB_TABLE}" \
             -backend-config="region=${AWS_REGION}"
-
-          echo "[*] Destruyendo infraestructura base..."
           terraform destroy -auto-approve -var-file="terraform.tfvars"
-
-      - name: 4. Purge Ephemeral Secrets in Secrets Manager
-        run: |
-          echo "[*] Eliminando secreto OAuth de Tailscale..."
-          aws secretsmanager delete-secret \
-            --secret-id "dev/tailscale/oauth" \
-            --force-delete-without-recovery \
-            --region ${{ env.AWS_REGION }} || true

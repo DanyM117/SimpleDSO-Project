@@ -19,6 +19,23 @@ module "core_eks" {
     environment = var.environment
 }
 
+resource "aws_ecr_repository" "agent_repo" {
+  name                 = "simpledso-agent"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
 
 module "hybrid_dns" {
   source = "../../modules/networking/hybrid_dns"
@@ -57,3 +74,4 @@ module "agent_security" {
   service_account_name = "agent-core-sa"
   agent_db_secret_arn  = module.agent_rds.master_user_secret_arn
 }
+

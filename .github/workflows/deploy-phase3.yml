@@ -155,26 +155,33 @@ jobs:
 
   k8s-deploy:
     name: "Deploy to EKS Cluster"
-    needs: [ecr-push]
-    # Espera a que el ERP esté aprovisionado si aplica
-    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    needs: [ecr-push, deploy-erp-cloud]
+    # Se ejecuta si ecr-push tuvo éxito y deploy-erp-cloud tuvo éxito o fue omitido (none/onpremise)
+    if: |
+      always() &&
+      needs.ecr-push.result == 'success' &&
+      (needs.deploy-erp-cloud.result == 'success' || needs.deploy-erp-cloud.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
       - name: Authenticate to AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
+
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
         with:
           version: "v1.31.0"
+
       - name: Generate Kubeconfig Context
         run: |
           aws eks update-kubeconfig --name simpledso-eks-cluster --region ${{ env.AWS_REGION }}
+
       - name: Deploy Workload via Kustomize
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -182,14 +189,16 @@ jobs:
           cd k8s/apps/agent-core
           kustomize edit set image 104091534720.dkr.ecr.us-east-1.amazonaws.com/simpledso-agent:latest=${REGISTRY}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           kubectl apply -k .
+
       - name: Verify Rollout Status
         run: |
           kubectl rollout status deployment/agent-core -n default --timeout=180s
+
       - name: Smoke Tests (Database & DNS)
         run: |
           echo "[*] Verificando logs del pod..."
           kubectl logs -n default deployment/agent-core --tail=30
-          echo "[*] Ejecutando sonda interna /ready..."
+          echo "[*] Validando persistencia (/ready)..."
           kubectl exec -n default deployment/agent-core -- wget -qO- http://127.0.0.1:5000/ready
-          echo "[*] Ejecutando validacion DNS hacia ERP..."
+          echo "[*] Validando resolución DNS híbrida hacia ERP (/api/v1/erp/ping)..."
           kubectl exec -n default deployment/agent-core -- wget -qO- http://127.0.0.1:5000/api/v1/erp/ping
