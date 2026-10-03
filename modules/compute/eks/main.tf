@@ -31,6 +31,20 @@ module "eks_aws" {
     cluster_endpoint_public_access  = true  # Variable corregida
     enable_cluster_creator_admin_permissions = true
 
+    access_entries = var.admin_principal_arn != "" ? {
+      local_admin = {
+        principal_arn = var.admin_principal_arn
+        policy_associations = {
+          admin = {
+            policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+            access_scope = {
+              type = "cluster"
+            }
+          }
+        }
+      }
+    } : {}
+
     vpc_id                   = var.vpc_id_main
     subnet_ids               = var.private_subnets_ids
     control_plane_subnet_ids = var.private_subnets_ids

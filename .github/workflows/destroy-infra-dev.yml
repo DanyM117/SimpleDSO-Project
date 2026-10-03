@@ -58,6 +58,14 @@ jobs:
           aws eks update-kubeconfig \
             --name simpledso-eks-cluster \
             --region ${{ env.AWS_REGION }} || true
+      
+      - name: 0. Purge Unmanaged Secrets in AWS Secrets Manager
+        run: |
+          echo "[*] Eliminando secreto dev/tailscale/oauth..."
+          aws secretsmanager delete-secret \
+            --secret-id "dev/tailscale/oauth" \
+            --force-delete-without-recovery \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || true
 
       - name: 1. Delete K8s Workloads & Secrets
         run: |

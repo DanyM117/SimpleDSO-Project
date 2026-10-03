@@ -62,8 +62,45 @@ module "ec2_erp" {
   monitoring             = true
   subnet_id              = var.app_subnet_id
   vpc_security_group_ids = [module.ec2_security_group_to.security_group_id]
+  enable_volume_tags     = true
 
-  enable_volume_tags = true
+  user_data = <<-EOF
+              #!/bin/bash
+              dnf update -y
+              dnf install -y docker python3
+              systemctl enable --now docker
+
+              # Servidor API ligero para responder a las herramientas del agente
+              cat << 'PYEOF' > /home/ec2-user/erp_service.py
+              from http.server import HTTPServer, BaseHTTPRequestHandler
+              import json
+
+              class Handler(BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'application/json')
+                      self.end_headers()
+                      if "/Item" in self.path:
+                          data = {"data": [
+                              {"name": "SERV-001", "item_name": "Consulta General", "standard_rate": 500},
+                              {"name": "SERV-002", "item_name": "Corte y Estilo", "standard_rate": 350}
+                          ]}
+                      else:
+                          data = {"data": []}
+                      self.wfile.write(json.dumps(data).encode())
+
+                  def do_POST(self):
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'application/json')
+                      self.end_headers()
+                      self.wfile.write(json.dumps({"data": {"name": "APPT-2026-001"}}).encode())
+
+              HTTPServer(('0.0.0.0', 8000), Handler).serve_forever()
+              PYEOF
+
+              python3 /home/ec2-user/erp_service.py &
+              EOF
+
   root_block_device = [
     {
       encrypted   = true

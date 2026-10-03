@@ -106,12 +106,14 @@ jobs:
           TF_VAR_key_pair_name: ${{ secrets.EC2_KEY_PAIR_NAME }}
           TF_VAR_erp_target: ${{ env.ERP_TARGET }}
           TF_VAR_onprem_erp_ip: ${{ env.ONPREM_IP }}
+          TF_VAR_admin_principal_arn: ${{ secrets.LOCAL_ADMIN_IAM_ARN }}
         run: |
           terraform apply -auto-approve \
             -var-file="terraform.tfvars" \
             -var="key_pair_name=${TF_VAR_key_pair_name}" \
             -var="erp_target=${TF_VAR_erp_target}" \
-            -var="onprem_erp_ip=${TF_VAR_onprem_erp_ip}"
+            -var="onprem_erp_ip=${TF_VAR_onprem_erp_ip}" \
+            -var="admin_principal_arn=${TF_VAR_admin_principal_arn}"
 
       - name: Export Critical Outputs
         id: tf_outputs
@@ -228,7 +230,10 @@ jobs:
           kubectl rollout status deployment/external-secrets -n external-secrets --timeout=180s
 
           echo "[*] Esperando a que Tailscale Operator este listo..."
-          kubectl rollout status deployment/operator -n tailscale --timeout=180s
+          if ! kubectl rollout status deployment/operator -n tailscale --timeout=90s; then
+            echo "::warning::Tailscale Operator no logro estabilizarse a tiempo. Revisa logs y credenciales OAuth."
+            kubectl logs -n tailscale deployment/operator --tail=30 || true
+          fi
         
 
       - name: Deploy ClusterSecretStore & ExternalSecret

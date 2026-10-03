@@ -1,46 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BACKEND_DIR="bootstrap"
-TFVARS_FILE="terraform.tfvars"
-
-echo "[*] Changing to bootstrap directory: ${BACKEND_DIR}"
-cd "$BACKEND_DIR" || exit 1
-
-# 1. Recuperar variables deterministas mediante el acceso OIDC
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 BUCKET_NAME="simpledso-infra-tfstate-${ACCOUNT_ID}"
 DYNAMO_TABLE="SimpleDSo-infra-tfstate-lock"
 AWS_REGION="us-east-1"
 
-# 2. Asegurar entorno limpio
-rm -f backend.tf .terraform.lock.hcl
-rm -rf .terraform/
+echo "[*] Purgando versiones y delete markers en S3: ${BUCKET_NAME}..."
+if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+  # Eliminar todas las versiones de objetos
+  VERSIONS=$(aws s3api list-object-versions --bucket "$BUCKET_NAME" --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}' --output json)
+  if [ "$VERSIONS" != '{"Objects":null}' ] && [ -n "$VERSIONS" ]; then
+    aws s3api delete-objects --bucket "$BUCKET_NAME" --delete "$VERSIONS" >/dev/null 2>&1 || true
+  fi
 
-# 3. Construir cascarón para conectarse al estado actual en AWS
-echo "[*] Inicializando conexión con el backend remoto en S3..."
-cat <<EOF > backend.tf
-terraform {
-  backend "s3" {}
-}
-EOF
+  # Eliminar delete markers
+  MARKERS=$(aws s3api list-object-versions --bucket "$BUCKET_NAME" --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' --output json)
+  if [ "$MARKERS" != '{"Objects":null}' ] && [ -n "$MARKERS" ]; then
+    aws s3api delete-objects --bucket "$BUCKET_NAME" --delete "$MARKERS" >/dev/null 2>&1 || true
+  fi
 
-terraform init \
-  -backend-config="bucket=${BUCKET_NAME}" \
-  -backend-config="key=bootstrap/terraform.tfstate" \
-  -backend-config="region=${AWS_REGION}" \
-  -backend-config="dynamodb_table=${DYNAMO_TABLE}" \
-  -backend-config="encrypt=true"
+  echo "[*] Eliminando bucket S3..."
+  aws s3 rb "s3://${BUCKET_NAME}" --force --region "$AWS_REGION"
+  echo "[OK] Bucket S3 eliminado."
+else
+  echo "[*] Bucket S3 no existe o ya fue eliminado."
+fi
 
-# 4. Migración Inversa (S3 -> Runner)
-echo "[*] Desconectando S3 y migrando el estado a la VM local..."
-rm -f backend.tf
+echo "[*] Eliminando tabla de bloqueos DynamoDB: ${DYNAMO_TABLE}..."
+if aws dynamodb describe-table --table-name "$DYNAMO_TABLE" --region "$AWS_REGION" >/dev/null 2>&1; then
+  aws dynamodb delete-table --table-name "$DYNAMO_TABLE" --region "$AWS_REGION" >/dev/null
+  echo "[OK] Tabla DynamoDB eliminada."
+else
+  echo "[*] Tabla DynamoDB no existe."
+fi
 
-# Al inicializar sin bloque backend, Terraform extrae el .tfstate hacia disco local
-terraform init -migrate-state -force-copy
-
-# 5. Destrucción
-echo "[*] Ejecutando Terraform Destroy utilizando el estado local..."
-terraform destroy -var-file="$TFVARS_FILE" -auto-approve
-
-echo "[OK] Infraestructura base destruida con éxito. El estado efímero desaparecerá al apagarse el Runner."
+# Limpieza en disco local del runner
+rm -rf bootstrap/.terraform bootstrap/.terraform.lock.hcl bootstrap/backend.tf bootstrap/terraform.tfstate*
+echo "[OK] Teardown completo del bootstrap ejecutado exitosamente."

@@ -69,3 +69,9 @@ variable "onprem_erp_ip" {
   type        = string
   default     = ""
 }
+
+variable "admin_principal_arn" {
+  description = "ARN del usuario/rol IAM local a registrar como cluster-admin"
+  type        = string
+  default     = ""
+}
