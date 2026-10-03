@@ -21,7 +21,7 @@ module "core_eks" {
 
 resource "aws_ecr_repository" "agent_repo" {
   name                 = "simpledso-agent"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true

@@ -111,9 +111,7 @@ jobs:
           context: .
           platforms: linux/arm64
           push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
 
   # Aprovisionamiento condicional de la EC2 en Fase 3
   deploy-erp-cloud:
