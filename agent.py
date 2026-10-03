@@ -1,11 +1,15 @@
 import os
-
 import boto3
-
 from erp_client import ERPNextClient
 
 bedrock = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 erp = ERPNextClient()
+
+# Definición del Inference Profile regional de Claude
+MODEL_ID = os.environ.get(
+    "BEDROCK_MODEL_ID",
+    "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+)
 
 TOOLS_SCHEMA = [
     {
