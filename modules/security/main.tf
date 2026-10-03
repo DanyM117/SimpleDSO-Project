@@ -64,8 +64,8 @@ data "aws_iam_policy_document" "agent_secrets_access" {
       "bedrock:InvokeModelWithResponseStream"
     ]
     resources = [
-      "arn:aws:bedrock:${local.region}::foundation-model/anthropic.*",
-      "arn:aws:bedrock:${local.region}::foundation-model/amazon.nova-*"
+      "arn:aws:bedrock:*::foundation-model/*",
+      "arn:aws:bedrock:*:*:inference-profile/*"
     ]
   }
 }

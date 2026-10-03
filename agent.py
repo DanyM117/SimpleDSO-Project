@@ -63,21 +63,27 @@ Usa las herramientas disponibles para consultar servicios y disponibilidad antes
 No inventes precios ni horarios que no hayan sido retornados por las herramientas."""
 
 
-def execute_tool(tool_name: str, tool_args: dict):
+def execute_tool(tool_name: str, tool_args: dict) -> dict:
     if tool_name == "get_services_catalog":
-        return erp.list_services()
+        # Envolver la lista en un objeto JSON con clave "services"
+        return {"services": erp.list_services()}
+
     if tool_name == "check_availability":
-        return erp.check_practitioner_availability(
-            practitioner_name=tool_args.get("practitioner", ""),
-            date=tool_args.get("date", "")
-        )
+        return {
+            "appointments": erp.check_practitioner_availability(
+                practitioner_name=tool_args.get("practitioner", ""),
+                date=tool_args.get("date", ""),
+            )
+        }
+
     if tool_name == "book_appointment":
         return erp.book_appointment(
             customer_name=tool_args.get("customer_name", ""),
             phone=tool_args.get("phone", ""),
             service=tool_args.get("service", ""),
-            datetime_str=tool_args.get("datetime_str", "")
+            datetime_str=tool_args.get("datetime_str", ""),
         )
+
     return {"error": "Herramienta no encontrada"}
 
 
@@ -86,21 +92,15 @@ def process_user_turn(history: list, new_message: str) -> str:
     for h in history:
         messages.append({
             "role": "user" if h["role"] == "user" else "assistant",
-            "content": [{"text": h["content"]}]
+            "content": [{"text": h["content"]}],
         })
     messages.append({"role": "user", "content": [{"text": new_message}]})
 
-    #model_id = "anthropic.claude-3-5-haiku-20241022-v1:0"
-    model_id = os.environ.get(
-    "BEDROCK_MODEL_ID",
-    "global.anthropic.claude-haiku-4-5-20251001-v1:0"
-    )
-
     response = bedrock.converse(
-        modelId=model_id,
+        modelId=MODEL_ID,
         messages=messages,
         system=[{"text": SYSTEM_PROMPT}],
-        toolConfig={"tools": TOOLS_SCHEMA}
+        toolConfig={"tools": TOOLS_SCHEMA},
     )
 
     stop_reason = response["stopReason"]
@@ -119,20 +119,26 @@ def process_user_turn(history: list, new_message: str) -> str:
 
                 result_data = execute_tool(tool_name, tool_input)
 
+                json_payload = (
+                    result_data
+                    if isinstance(result_data, dict)
+                    else {"data": result_data}
+                )
+
                 tool_results.append({
                     "toolResult": {
                         "toolUseId": tool_id,
-                        "content": [{"json": result_data}]
+                        "content": [{"json": json_payload}],
                     }
                 })
 
         messages.append({"role": "user", "content": tool_results})
 
         final_response = bedrock.converse(
-            modelId=model_id,
+            modelId=MODEL_ID,
             messages=messages,
             system=[{"text": SYSTEM_PROMPT}],
-            toolConfig={"tools": TOOLS_SCHEMA}
+            toolConfig={"tools": TOOLS_SCHEMA},
         )
         return final_response["output"]["message"]["content"][0]["text"]
 
