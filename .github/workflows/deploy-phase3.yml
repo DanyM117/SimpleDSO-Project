@@ -114,9 +114,10 @@ jobs:
           tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
 
   # Aprovisionamiento condicional de la EC2 en Fase 3
+  # Aprovisionamiento condicional de la EC2 en Fase 3
   deploy-erp-cloud:
     name: "Deploy ERP Cloud (EC2 & DNS)"
-    if: github.event.inputs.erp_target == 'cloud' || (github.event_name == 'push' && env.ERP_TARGET == 'cloud')
+    if: inputs.erp_target == 'cloud' || github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -124,16 +125,19 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
       - name: Authenticate to AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.9.5
+
       - name: Initialize Backend
         run: |
           terraform init \
@@ -142,6 +146,7 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="dynamodb_table=${{ env.DYNAMODB_TABLE }}" \
             -backend-config="encrypt=true"
+
       - name: Apply ERP EC2 & Route53 Record
         env:
           TF_VAR_key_pair_name: ${{ secrets.EC2_KEY_PAIR_NAME }}
