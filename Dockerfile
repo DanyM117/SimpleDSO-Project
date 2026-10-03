@@ -23,7 +23,7 @@ WORKDIR /app
 
 # Copiar paquetes de Python compilados en el usuario appuser
 COPY --from=builder /root/.local /home/appuser/.local
-COPY --chown=appuser:appgroup app.py .
+COPY --chown=appuser:appgroup *.py .
 
 ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \

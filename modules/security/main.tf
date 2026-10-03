@@ -64,8 +64,8 @@ data "aws_iam_policy_document" "agent_secrets_access" {
       "bedrock:InvokeModelWithResponseStream"
     ]
     resources = [
-      "arn:aws:bedrock:${local.region}::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0",
-      "arn:aws:bedrock:${local.region}::foundation-model/amazon.nova-lite-v1:0"
+      "arn:aws:bedrock:${local.region}::foundation-model/anthropic.*",
+      "arn:aws:bedrock:${local.region}::foundation-model/amazon.nova-*"
     ]
   }
 }
