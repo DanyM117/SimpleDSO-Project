@@ -59,9 +59,12 @@ jobs:
             --name simpledso-eks-cluster \
             --region ${{ env.AWS_REGION }} || true
 
-      - name: 1. Delete K8s Custom Resources & Secrets
+      - name: 1. Delete K8s Workloads, Custom Resources & Secrets
         run: |
-          echo "[*] Purgando recursos de External Secrets..."
+          echo "[*] Purgando workload de aplicacion (Fase 3)..."
+          kubectl delete -k k8s/apps/agent-core/ --ignore-not-found --timeout=60s || true
+
+          echo "[*] Purgando recursos de External Secrets (Fase 2)..."
           kubectl delete -f k8s/base/external-secrets/ --ignore-not-found --timeout=60s || true
           kubectl delete secret agent-postgres-secret -n default --ignore-not-found || true
 
