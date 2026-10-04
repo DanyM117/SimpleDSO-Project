@@ -1,6 +1,9 @@
 name: "DevSecOps - Deploy Monolith Stack (EC2 Only)"
 
 on:
+  push:
+    branches:
+      - feature/monolithic-ec2
   workflow_dispatch:
     inputs:
       erp_target:
@@ -46,6 +49,7 @@ jobs:
     name: "Terraform Apply (VPC & EC2)"
     needs: [static-analysis]
     runs-on: ubuntu-latest
+    environment: dev
     defaults:
       run:
         working-directory: envs/dev-ec2
@@ -74,7 +78,7 @@ jobs:
             -backend-config="dynamodb_table=${{ env.DYNAMODB_TABLE }}" \
             -backend-config="encrypt=true"
           terraform apply -auto-approve \
-            -var="erp_target=${{ github.event.inputs.erp_target }}"
+            -var="erp_target=${{ github.event.inputs.erp_target || 'cloud' }}"
 
       - name: Export Outputs
         id: tf_outputs
@@ -142,7 +146,7 @@ jobs:
           ansible-playbook -i "${{ needs.provision-infra.outputs.instance_id }}," deploy-monolith.yml \
             -u ec2-user \
             -c amazon.aws.aws_ssm \
-            --extra-vars "ansible_aws_ssm_region=${{ env.AWS_REGION }} aws_region=${{ env.AWS_REGION }} ecr_registry=${{ needs.provision-infra.outputs.ecr_registry }} image_tag=${{ env.IMAGE_TAG }} erp_target=${{ github.event.inputs.erp_target }} onprem_ip=${{ github.event.inputs.onprem_ip }}"
+            --extra-vars "ansible_aws_ssm_region=${{ env.AWS_REGION }} aws_region=${{ env.AWS_REGION }} ecr_registry=${{ needs.provision-infra.outputs.ecr_registry }} image_tag=${{ env.IMAGE_TAG }} erp_target=${{ github.event.inputs.erp_target || 'cloud' }} onprem_ip=${{ github.event.inputs.onprem_ip || '' }}"
 
       - name: Smoke Tests en Vivo
         run: |
