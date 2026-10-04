@@ -139,8 +139,28 @@ jobs:
       - name: Esperar a que la instancia registre en SSM
         run: |
           INSTANCE_ID="${{ needs.provision-infra.outputs.instance_id }}"
-          echo "[*] Verificando SSM Agent en $INSTANCE_ID..."
-          aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
+          echo "[*] Esperando a que el agente de SSM reporte estado Online en $INSTANCE_ID..."
+          
+          STATUS="None"
+          for i in {1..36}; do
+            STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text 2>/dev/null || echo "None")
+            
+            if [ "$STATUS" = "Online" ]; then
+              echo "[OK] Instancia $INSTANCE_ID conectada y lista en Systems Manager."
+              break
+            fi
+            
+            echo "[-] Esperando registro en SSM... intento $i/36 (Estado: $STATUS)"
+            sleep 5
+          done
+
+          if [ "$STATUS" != "Online" ]; then
+            echo "[X] Error critico: La instancia no alcanzo estado Online en SSM tras 3 minutos."
+            exit 1
+          fi
 
       - name: Ejecutar Playbook
         working-directory: ansible
