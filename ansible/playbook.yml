@@ -1,0 +1,66 @@
+---
+- name: Aprovisionar Stack de ERPNext en EC2
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Actualizar repositorios e instalar paquetes base
+      ansible.builtin.dnf:
+        name:
+          - git
+          - docker
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Habilitar y levantar servicio de Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Clonar frappe_docker
+      ansible.builtin.git:
+        repo: https://github.com/frappe/frappe_docker.git
+        dest: /opt/frappe_docker
+        version: main
+
+    - name: Configurar variables de entorno de producción
+      ansible.builtin.copy:
+        dest: /opt/frappe_docker/.env
+        content: |
+          ERPNEXT_VERSION=v15.0.0
+          FRAPPE_VERSION=v15.0.0
+          MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!
+          ADMIN_PASSWORD=AdminStrongErpPassword2026!
+          SITES=api.erp.internal
+        mode: '0600'
+
+    - name: Levantar infraestructura de contenedores ERPNext
+      ansible.builtin.command:
+        cmd: docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
+        chdir: /opt/frappe_docker
+
+    - name: Esperar disponibilidad de MariaDB
+      ansible.builtin.command:
+        cmd: docker compose --project-name erpnext exec -T mariadb mysqladmin ping -h localhost -u root --password=AdminStrongRootPassword2026!
+        chdir: /opt/frappe_docker
+      register: db_status
+      until: db_status.rc == 0
+      retries: 15
+      delay: 5
+      changed_when: false
+
+    - name: Crear sitio Frappe con ERPNext (toma entre 5 y 10 minutos)
+      ansible.builtin.command:
+        cmd: >
+          docker compose --project-name erpnext exec -T backend
+          bench new-site api.erp.internal
+          --mariadb-root-password AdminStrongRootPassword2026!
+          --admin-password AdminStrongErpPassword2026!
+          --install-app erpnext
+          --set-default
+        chdir: /opt/frappe_docker
+      args:
+        creates: /opt/frappe_docker/sites/api.erp.internal

@@ -5,7 +5,7 @@ import requests
 
 class ERPNextClient:
     def __init__(self):
-        self.base_url = f"http://{os.environ.get('ERP_HOST', 'api.erp.internal')}:8000"
+        self.base_url = f"http://{os.environ.get('ERP_HOST', 'api.erp.internal')}"
         api_key = os.environ.get("ERP_API_KEY", "")
         api_secret = os.environ.get("ERP_API_SECRET", "")
         self.headers = {

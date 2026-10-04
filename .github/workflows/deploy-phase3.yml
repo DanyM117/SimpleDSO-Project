@@ -155,15 +155,61 @@ jobs:
             -var-file="terraform.tfvars" \
             -var="state_bucket_name=${{ env.TF_STATE_BUCKET }}" \
             -var="key_pair_name=${TF_VAR_key_pair_name}"
+  
+  configure-erp-ansible:
+    name: "Configure ERPNext via Ansible & SSM"
+    needs: [deploy-erp-cloud]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Setup Python Runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible & AWS SSM dependencies
+        run: |
+          pip install ansible boto3 botocore
+          ansible-galaxy collection install amazon.aws community.aws
+
+          # Instalar Session Manager Plugin en el runner de GitHub
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i session-manager-plugin.deb
+
+      - name: Wait for EC2 SSM Agent Registration
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=simpledso-erp-instance" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" --output text)
+
+          echo "[*] Esperando registro de la instancia $INSTANCE_ID en SSM..."
+          aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
+          echo "[OK] Instancia en línea en Systems Manager."
+
+      - name: Run Ansible Playbook over SSM
+        working-directory: ansible
+        run: |
+          ansible-playbook -i inventory.aws_ec2.yml playbook.yml \
+            -u ec2-user \
+            --extra-vars "ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_region=${{ env.AWS_REGION }}"
 
   k8s-deploy:
     name: "Deploy to EKS Cluster"
-    needs: [ecr-push, deploy-erp-cloud]
-    # Se ejecuta si ecr-push tuvo éxito y deploy-erp-cloud tuvo éxito o fue omitido (none/onpremise)
+    needs: [ecr-push, deploy-erp-cloud, configure-erp-ansible]
     if: |
       always() &&
       needs.ecr-push.result == 'success' &&
-      (needs.deploy-erp-cloud.result == 'success' || needs.deploy-erp-cloud.result == 'skipped')
+      (needs.deploy-erp-cloud.result == 'success' || needs.deploy-erp-cloud.result == 'skipped') &&
+      (needs.configure-erp-ansible.result == 'success' || needs.configure-erp-ansible.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code

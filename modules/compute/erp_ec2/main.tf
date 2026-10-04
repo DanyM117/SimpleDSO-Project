@@ -51,11 +51,41 @@ module "ec2_security_group_to" {
   }
 }
 
+# Rol IAM para la instancia EC2
+resource "aws_iam_role" "erp_ssm_role" {
+  name = "${var.ec2_name}-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+
+  tags = {
+    Environment = var.environment
+    Terraform   = "true"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.erp_ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "erp_profile" {
+  name = "${var.ec2_name}-instance-profile"
+  role = aws_iam_role.erp_ssm_role.name
+}
+
 module "ec2_erp" {
   source  = "terraform-aws-modules/ec2-instance/aws"
   version = "~> 5.7"
 
   name                   = var.ec2_name
+  iam_instance_profile = aws_iam_instance_profile.erp_profile.name
   ami                    = data.aws_ami.amazon_linux_arm.id
   instance_type          = "t4g.medium"
   key_name               = var.key_pair_name
@@ -95,7 +125,7 @@ module "ec2_erp" {
                       self.end_headers()
                       self.wfile.write(json.dumps({"data": {"name": "APPT-2026-001"}}).encode())
 
-              HTTPServer(('0.0.0.0', 8000), Handler).serve_forever()
+              HTTPServer(('0.0.0.0', 80), Handler).serve_forever()
               PYEOF
 
               python3 /home/ec2-user/erp_service.py &
