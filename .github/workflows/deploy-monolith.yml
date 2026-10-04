@@ -91,6 +91,7 @@ jobs:
     name: "Build ARM64 & Push to ECR"
     needs: [provision-infra]
     runs-on: ubuntu-latest
+    environment: dev
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -115,6 +116,7 @@ jobs:
     name: "Configure EC2 via Ansible over SSM"
     needs: [provision-infra, build-and-push-ecr]
     runs-on: ubuntu-latest
+    environment: dev
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
