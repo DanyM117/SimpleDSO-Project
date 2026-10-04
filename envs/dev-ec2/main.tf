@@ -145,23 +145,21 @@ resource "aws_ecr_repository" "agent_repo" {
   }
 }
 
-# 5. Instancia EC2 Unificada (Dimensionamiento Dinámico según ERP)
+# 5. Instancia EC2 Unificada (Dimensionamiento Dinamico segun ERP)
 resource "aws_instance" "monolith" {
-  ami                  = data.aws_ami.amazon_linux_arm.id
-  # Si corre ERPNext local requiere 8 GB RAM (t4g.large); si es on-premise basta 2 GB RAM (t4g.small)
-  instance_type        = var.erp_target == "cloud" ? "t4g.large" : "t4g.small"
-  subnet_id            = aws_subnet.public.id
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+  ami                    = data.aws_ami.amazon_linux_arm.id
+  instance_type          = var.erp_target == "cloud" ? "t4g.large" : "t4g.small"
+  subnet_id              = aws_subnet.public.id
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   vpc_security_group_ids = [aws_security_group.monolith_sg.id]
 
-  # User data para habilitar Swap y preparar Docker
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
               dnf install -y docker
               systemctl enable --now docker
 
-              # Swap de 4GB para amortiguar consumo de memoria de Frappe/Python
+              # Swap de 4GB para mitigar picos de memoria de Frappe
               fallocate -l 4G /swapfile
               chmod 600 /swapfile
               mkswap /swapfile
@@ -175,11 +173,11 @@ resource "aws_instance" "monolith" {
     encrypted             = true
     delete_on_termination = true
   }
-  
+
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 2 # Requerido para que Docker herede el Instance Profile
+    http_put_response_hop_limit = 2
   }
 
   tags = {

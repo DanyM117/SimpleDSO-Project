@@ -4,13 +4,13 @@ services:
     container_name: simpledso-agent-db
     restart: always
     environment:
-      POSTGRES_DB: agent_core
-      POSTGRES_USER: agent_admin
+      POSTGRES_DB: ${DB_NAME:-agent_core}
+      POSTGRES_USER: ${DB_USER:-agent_admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-AgentPostgresSecure2026!}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agent_admin -d agent_core"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-agent_admin} -d ${DB_NAME:-agent_core}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -27,12 +27,16 @@ services:
       PORT: "5000"
       DB_HOST: "agent-db"
       DB_PORT: "5432"
-      DB_NAME: "agent_core"
-      DB_USER: "agent_admin"
+      DB_NAME: ${DB_NAME:-agent_core}
+      DB_USER: ${DB_USER:-agent_admin}
       DB_PASSWORD: ${DB_PASSWORD:-AgentPostgresSecure2026!}
-      ERP_HOST: ${ERP_HOST:-127.0.0.1}
-      AWS_REGION: us-east-1
-      BEDROCK_MODEL_ID: "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+      ERP_HOST: ${ERP_HOST:-host.docker.internal:8080}
+      ERP_API_KEY: ${ERP_API_KEY:-}
+      ERP_API_SECRET: ${ERP_API_SECRET:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.anthropic.claude-3-5-haiku-20241022-v1:0}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       agent-db:
         condition: service_healthy
@@ -41,6 +45,7 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
 
 networks:
   simpledso-net:

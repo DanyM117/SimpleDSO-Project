@@ -10,7 +10,7 @@ erp = ERPNextClient()
 # Definición del Inference Profile regional de Claude
 MODEL_ID = os.environ.get(
     "BEDROCK_MODEL_ID",
-    "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "us.anthropic.claude-3-5-haiku-20241022-v1:0",
 )
 
 TOOLS_SCHEMA = [
@@ -68,12 +68,9 @@ Tu objetivo es responder consultas de forma breve, profesional y concretar citas
 Usa las herramientas disponibles para consultar servicios y disponibilidad antes de confirmar una reserva.
 No inventes precios ni horarios que no hayan sido retornados por las herramientas."""
 
-
 def execute_tool(tool_name: str, tool_args: dict) -> dict:
     if tool_name == "get_services_catalog":
-        # Envolver la lista en un objeto JSON con clave "services"
         return {"services": erp.list_services()}
-
     if tool_name == "check_availability":
         return {
             "appointments": erp.check_practitioner_availability(
@@ -81,7 +78,6 @@ def execute_tool(tool_name: str, tool_args: dict) -> dict:
                 date=tool_args.get("date", ""),
             )
         }
-
     if tool_name == "book_appointment":
         return erp.book_appointment(
             customer_name=tool_args.get("customer_name", ""),
@@ -89,9 +85,7 @@ def execute_tool(tool_name: str, tool_args: dict) -> dict:
             service=tool_args.get("service", ""),
             datetime_str=tool_args.get("datetime_str", ""),
         )
-
     return {"error": "Herramienta no encontrada"}
-
 
 def process_user_turn(history: list, new_message: str) -> str:
     messages = []
@@ -110,11 +104,9 @@ def process_user_turn(history: list, new_message: str) -> str:
     )
 
     stop_reason = response["stopReason"]
-
     if stop_reason == "tool_use":
         assistant_content = response["output"]["message"]["content"]
         messages.append({"role": "assistant", "content": assistant_content})
-
         tool_results = []
         for block in assistant_content:
             if "toolUse" in block:
@@ -122,24 +114,19 @@ def process_user_turn(history: list, new_message: str) -> str:
                 tool_id = tool_use["toolUseId"]
                 tool_name = tool_use["name"]
                 tool_input = tool_use["input"]
-
                 result_data = execute_tool(tool_name, tool_input)
-
                 json_payload = (
                     result_data
                     if isinstance(result_data, dict)
                     else {"data": result_data}
                 )
-
                 tool_results.append({
                     "toolResult": {
                         "toolUseId": tool_id,
                         "content": [{"json": json_payload}],
                     }
                 })
-
         messages.append({"role": "user", "content": tool_results})
-
         final_response = bedrock.converse(
             modelId=MODEL_ID,
             messages=messages,
@@ -147,5 +134,4 @@ def process_user_turn(history: list, new_message: str) -> str:
             toolConfig={"tools": TOOLS_SCHEMA},
         )
         return final_response["output"]["message"]["content"][0]["text"]
-
     return response["output"]["message"]["content"][0]["text"]
