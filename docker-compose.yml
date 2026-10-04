@@ -34,7 +34,7 @@ services:
       ERP_API_KEY: ${ERP_API_KEY:-}
       ERP_API_SECRET: ${ERP_API_SECRET:-}
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.anthropic.claude-3-5-haiku-20241022-v1:0}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-global.anthropic.claude-haiku-4-5-20251001-v1:0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
