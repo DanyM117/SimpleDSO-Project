@@ -1,0 +1,156 @@
+name: "DevSecOps - Deploy Monolith Stack (EC2 Only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      erp_target:
+        description: 'Estrategia ERPNext (cloud / onpremise)'
+        required: true
+        default: 'cloud'
+        type: choice
+        options:
+          - cloud
+          - onpremise
+      onprem_ip:
+        description: 'IP privada/Tailscale si erp_target == onpremise'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: "us-east-1"
+  TF_STATE_BUCKET: "simpledso-infra-tfstate-104091534720"
+  DYNAMODB_TABLE: "SimpleDSo-infra-tfstate-lock"
+  ECR_REPOSITORY: "simpledso-agent"
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  static-analysis:
+    name: "SAST & SCA Analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff bandit pip-audit
+      - run: ruff check .
+      - run: bandit -r app.py -ll
+      - run: pip-audit -r requirements.txt
+
+  provision-infra:
+    name: "Terraform Apply (VPC & EC2)"
+    needs: [static-analysis]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: envs/dev-ec2
+    outputs:
+      instance_id: ${{ steps.tf_outputs.outputs.instance_id }}
+      public_ip: ${{ steps.tf_outputs.outputs.public_ip }}
+      ecr_registry: ${{ steps.tf_outputs.outputs.ecr_registry }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: Terraform Init & Apply
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=dev/ec2-monolith/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ env.DYNAMODB_TABLE }}" \
+            -backend-config="encrypt=true"
+          terraform apply -auto-approve \
+            -var="erp_target=${{ github.event.inputs.erp_target }}"
+
+      - name: Export Outputs
+        id: tf_outputs
+        run: |
+          echo "instance_id=$(terraform output -raw instance_id)" >> $GITHUB_OUTPUT
+          echo "public_ip=$(terraform output -raw public_ip)" >> $GITHUB_OUTPUT
+          echo "ecr_registry=$(terraform output -raw ecr_repository_url | cut -d/ -f1)" >> $GITHUB_OUTPUT
+
+  build-and-push-ecr:
+    name: "Build ARM64 & Push to ECR"
+    needs: [provision-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+  ansible-deploy:
+    name: "Configure EC2 via Ansible over SSM"
+    needs: [provision-infra, build-and-push-ecr]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible & Session Manager Plugin
+        run: |
+          pip install ansible boto3 botocore
+          ansible-galaxy collection install amazon.aws community.aws
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i session-manager-plugin.deb
+
+      - name: Esperar a que la instancia registre en SSM
+        run: |
+          INSTANCE_ID="${{ needs.provision-infra.outputs.instance_id }}"
+          echo "[*] Verificando SSM Agent en $INSTANCE_ID..."
+          aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
+
+      - name: Ejecutar Playbook
+        working-directory: ansible
+        run: |
+          ansible-playbook -i "${{ needs.provision-infra.outputs.instance_id }}," deploy-monolith.yml \
+            -u ec2-user \
+            -c amazon.aws.aws_ssm \
+            --extra-vars "ansible_aws_ssm_region=${{ env.AWS_REGION }} aws_region=${{ env.AWS_REGION }} ecr_registry=${{ needs.provision-infra.outputs.ecr_registry }} image_tag=${{ env.IMAGE_TAG }} erp_target=${{ github.event.inputs.erp_target }} onprem_ip=${{ github.event.inputs.onprem_ip }}"
+
+      - name: Smoke Tests en Vivo
+        run: |
+          PUBLIC_IP="${{ needs.provision-infra.outputs.public_ip }}"
+          echo "[*] Probando persistencia en EC2 (/ready)..."
+          curl --fail --retry 5 --retry-delay 5 "http://${PUBLIC_IP}/ready"
+          
+          echo "[*] Probando inferencia conversacional con Bedrock..."
+          curl --fail -X POST "http://${PUBLIC_IP}/api/v1/chat" \
+            -H "Content-Type: application/json" \
+            -d '{"session_id":"smoke-test-ec2","message":"Hola"}'

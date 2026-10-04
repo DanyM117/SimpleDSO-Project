@@ -1,0 +1,43 @@
+name: "DevSecOps - Destroy Monolith Stack (EC2 Only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destruction:
+        description: 'Escribe "DESTROY" para confirmar'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_destruction == 'DESTROY'
+    defaults:
+      run:
+        working-directory: envs/dev-ec2
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          audience: sts.amazonaws.com
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: Terraform Destroy
+        run: |
+          terraform init \
+            -backend-config="bucket=simpledso-infra-tfstate-104091534720" \
+            -backend-config="key=dev/ec2-monolith/terraform.tfstate" \
+            -backend-config="region=us-east-1" \
+            -backend-config="dynamodb_table=SimpleDSo-infra-tfstate-lock" \
+            -backend-config="encrypt=true"
+          terraform destroy -auto-approve
