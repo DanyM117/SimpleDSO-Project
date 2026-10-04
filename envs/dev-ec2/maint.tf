@@ -175,6 +175,12 @@ resource "aws_instance" "monolith" {
     encrypted             = true
     delete_on_termination = true
   }
+  
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2 # Requerido para que Docker herede el Instance Profile
+  }
 
   tags = {
     Name = "simpledso-monolith-instance"

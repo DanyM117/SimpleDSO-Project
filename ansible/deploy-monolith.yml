@@ -1,74 +1,53 @@
----
-- name: Desplegar Stack Monolitico SimpleDSO
-  hosts: all
-  become: true
-  gather_facts: true
+services:
+  agent-db:
+    image: postgres:16-alpine
+    container_name: simpledso-agent-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-agent_core}
+      POSTGRES_USER: ${DB_USER:-agent_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-AgentPostgresSecure2026!}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-agent_admin} -d ${DB_NAME:-agent_core}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - simpledso-net
 
-  tasks:
-    - name: Instalar dependencias base en Amazon Linux 2023
-      ansible.builtin.dnf:
-        name:
-          - git
-          - docker
-          - docker-compose-plugin
-        state: present
-        update_cache: true
+  agent-core:
+    image: ${ECR_REGISTRY}/simpledso-agent:${IMAGE_TAG:-latest}
+    container_name: simpledso-agent-core
+    restart: always
+    ports:
+      - "80:5000"
+    environment:
+      PORT: "5000"
+      DB_HOST: "agent-db"
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-agent_core}
+      DB_USER: ${DB_USER:-agent_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-AgentPostgresSecure2026!}
+      ERP_HOST: ${ERP_HOST:-host.docker.internal:8080}
+      ERP_API_KEY: ${ERP_API_KEY:-}
+      ERP_API_SECRET: ${ERP_API_SECRET:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.anthropic.claude-3-5-haiku-20241022-v1:0}
+    extra_hosts:
+      # Permite al contenedor acceder a los servicios expuestos en el host (puerto 8080 de frappe_docker)
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      agent-db:
+        condition: service_healthy
+    networks:
+      - simpledso-net
 
-    - name: Iniciar y habilitar servicio Docker
-      ansible.builtin.systemd:
-        name: docker
-        state: started
-        enabled: true
+volumes:
+  postgres_data:
+    driver: local
 
-    - name: Autenticar Docker contra AWS ECR usando el Instance Profile
-      ansible.builtin.shell: |
-        aws ecr get-login-password --region {{ aws_region }} | docker login --username AWS --password-stdin {{ ecr_registry }}
-      changed_when: false
-
-    - name: Crear directorio de la aplicacion
-      ansible.builtin.file:
-        path: /opt/simpledso
-        state: directory
-        mode: '0755'
-
-    - name: Copiar definicion de Docker Compose
-      ansible.builtin.copy:
-        src: ../docker-compose.yml
-        dest: /opt/simpledso/docker-compose.yml
-        mode: '0644'
-
-    - name: Desplegar contenedores con Docker Compose
-      ansible.builtin.command:
-        cmd: docker compose pull && docker compose up -d --remove-orphans
-        chdir: /opt/simpledso
-      environment:
-        ECR_REGISTRY: "{{ ecr_registry }}"
-        IMAGE_TAG: "{{ image_tag }}"
-        ERP_HOST: "{{ '127.0.0.1' if erp_target == 'cloud' else onprem_ip }}"
-      changed_when: true
-
-    # Si se selecciona ERP en la nube, se despliega frappe_docker en la misma máquina
-    - name: Desplegar frappe_docker (ERP Cloud)
-      when: erp_target == 'cloud'
-      block:
-        - name: Clonar repositorio frappe_docker
-          ansible.builtin.git:
-            repo: https://github.com/frappe/frappe_docker.git
-            dest: /opt/frappe_docker
-            version: main
-
-        - name: Configurar .env de ERPNext
-          ansible.builtin.copy:
-            dest: /opt/frappe_docker/.env
-            content: |
-              ERPNEXT_VERSION=v15.0.0
-              FRAPPE_VERSION=v15.0.0
-              MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!
-              ADMIN_PASSWORD=AdminStrongErpPassword2026!
-            mode: '0600'
-
-        - name: Levantar contenedores de ERPNext
-          ansible.builtin.command:
-            cmd: docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
-            chdir: /opt/frappe_docker
-          changed_when: false
+networks:
+  simpledso-net:
+    driver: bridge
