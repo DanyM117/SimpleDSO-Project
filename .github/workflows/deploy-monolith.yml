@@ -151,36 +151,86 @@ jobs:
           IMAGE_TAG="${{ env.IMAGE_TAG }}"
           ERP_TARGET="${{ github.event.inputs.erp_target || 'cloud' }}"
           ERP_HOST="${{ github.event.inputs.erp_target == 'cloud' && 'host.docker.internal:8080' || github.event.inputs.onprem_ip }}"
-
-          # Base64 del docker-compose.yml para inyectarlo sin dependencias de S3
           COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
 
-          echo "[*] Enviando comandos de aprovisionamiento..."
+          # 1. Generar script de despliegue determinista
+          cat << 'EOF' > deploy_remote.sh
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          echo "[*] Verificando dependencias base (Docker & Git)..."
+          dnf install -y docker git
+          systemctl enable --now docker
+
+          echo "[*] Verificando Docker Compose CLI plugin (ARM64)..."
+          if ! docker compose version >/dev/null 2>&1; then
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          fi
+
+          echo "[*] Autenticando Docker contra Amazon ECR..."
+          aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __ECR_REG__
+
+          echo "[*] Escribiendo docker-compose.yml..."
+          mkdir -p /opt/simpledso
+          echo '__COMPOSE_B64__' | base64 -d > /opt/simpledso/docker-compose.yml
+          cd /opt/simpledso
+
+          export ECR_REGISTRY=__ECR_REG__
+          export IMAGE_TAG=__IMAGE_TAG__
+          export ERP_HOST=__ERP_HOST__
+
+          echo "[*] Descargando y levantando contenedores..."
+          docker compose pull
+          docker compose up -d --remove-orphans
+          EOF
+
+          # Inyectar variables en el script
+          sed -i "s|__AWS_REGION__|${{ env.AWS_REGION }}|g" deploy_remote.sh
+          sed -i "s|__ECR_REG__|${ECR_REG}|g" deploy_remote.sh
+          sed -i "s|__IMAGE_TAG__|${IMAGE_TAG}|g" deploy_remote.sh
+          sed -i "s|__ERP_HOST__|${ERP_HOST}|g" deploy_remote.sh
+          sed -i "s|__COMPOSE_B64__|${COMPOSE_B64}|g" deploy_remote.sh
+
+          SCRIPT_B64=$(base64 -w 0 deploy_remote.sh)
+
+          echo "[*] Despachando script a través de AWS SSM..."
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands="[
-              \"dnf install -y docker docker-compose-plugin git\",
-              \"systemctl enable --now docker\",
-              \"aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REG\",
-              \"mkdir -p /opt/simpledso\",
-              \"echo '$COMPOSE_B64' | base64 -d > /opt/simpledso/docker-compose.yml\",
-              \"cd /opt/simpledso\",
-              \"export ECR_REGISTRY=$ECR_REG IMAGE_TAG=$IMAGE_TAG ERP_HOST=$ERP_HOST\",
-              \"docker compose pull && docker compose up -d --remove-orphans\"
-            ]" \
+            --parameters commands="[\"echo '$SCRIPT_B64' | base64 -d | bash\"]" \
             --query "Command.CommandId" \
             --output text)
 
-          echo "[*] Esperando finalización del comando $COMMAND_ID..."
-          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
-          
-          # Imprimir salida de la ejecución en los logs de GitHub Actions
+          echo "[*] Esperando ejecución del comando $COMMAND_ID en la instancia..."
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" || true
+
+          echo "=== STDOUT DEL COMANDO ==="
           aws ssm get-command-invocation \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_ID" \
             --query "StandardOutputContent" \
-            --output text
+            --output text || true
+
+          echo "=== STDERR DEL COMANDO ==="
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query "StandardErrorContent" \
+            --output text || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query "Status" \
+            --output text)
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "[X] Error crítico: El comando en la EC2 terminó con estado: $STATUS"
+            exit 1
+          fi
+          echo "[OK] Despliegue de contenedores completado con éxito."
 
       - name: Smoke Tests en Vivo
         run: |

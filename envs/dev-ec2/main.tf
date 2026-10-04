@@ -156,10 +156,15 @@ resource "aws_instance" "monolith" {
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
-              dnf install -y docker
+              dnf install -y docker git
               systemctl enable --now docker
 
-              # Swap de 4GB para mitigar picos de memoria de Frappe
+              # Instalar Docker Compose CLI plugin ARM64
+              mkdir -p /usr/local/lib/docker/cli-plugins
+              curl -sSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+              chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+              # Swap de 4GB para amortiguar picos de memoria de Frappe/Python
               fallocate -l 4G /swapfile
               chmod 600 /swapfile
               mkswap /swapfile

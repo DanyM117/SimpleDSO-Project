@@ -1,6 +1,7 @@
 import os
 
 import psycopg2
+
 from psycopg2.extras import RealDictCursor
 
 
@@ -11,7 +12,7 @@ def get_db_connection():
         dbname=os.environ.get("DB_NAME", "agent_core"),
         user=os.environ.get("DB_USER"),
         password=os.environ.get("DB_PASSWORD"),
-        sslmode="require",
+        sslmode=os.environ.get("DB_SSLMODE", "prefer"),
         connect_timeout=3,
     )
 
