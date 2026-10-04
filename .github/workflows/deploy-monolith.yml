@@ -145,131 +145,131 @@ jobs:
           [ "$STATUS" = "Online" ] || exit 1
 
       - name: Ejecutar Despliegue en EC2 via SSM Send-Command
-    run: |
-      INSTANCE_ID="${{ needs.provision-infra.outputs.instance_id }}"
-      ECR_REG="${{ needs.provision-infra.outputs.ecr_registry }}"
-      IMAGE_TAG="${{ env.IMAGE_TAG }}"
-      ERP_TARGET="${{ github.event.inputs.erp_target || 'cloud' }}"
-      ERP_HOST="${{ github.event.inputs.erp_target == 'cloud' && 'host.docker.internal:8080' || github.event.inputs.onprem_ip }}"
-      COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
-
-      cat << 'EOF' > deploy_remote.sh
-      #!/usr/bin/env bash
-      set -euo pipefail
-
-      echo "[1/4] Instalando dependencias base..."
-      dnf install -y docker git
-      systemctl enable --now docker
-
-      echo "[2/4] Verificando Docker Compose CLI plugin..."
-      if ! docker compose version >/dev/null 2>&1; then
-        mkdir -p /usr/local/lib/docker/cli-plugins
-        curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64" -o /usr/local/lib/docker/cli-plugins/docker-compose
-        chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-      fi
-
-      echo "[3/4] Desplegando Stack del Agente IA..."
-      aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __ECR_REG__
-      mkdir -p /opt/simpledso
-      echo '__COMPOSE_B64__' | base64 -d > /opt/simpledso/docker-compose.yml
-      cd /opt/simpledso
-      export ECR_REGISTRY=__ECR_REG__
-      export IMAGE_TAG=__IMAGE_TAG__
-      export ERP_HOST=__ERP_HOST__
-      docker compose pull
-      docker compose up -d --remove-orphans
-
-      if [ "__ERP_TARGET__" = "cloud" ]; then
-        echo "[4/4] Desplegando Stack de ERPNext (frappe_docker)..."
-        if [ ! -d "/opt/frappe_docker" ]; then
-          git clone https://github.com/frappe/frappe_docker.git /opt/frappe_docker
-        fi
-        cd /opt/frappe_docker
-
-        cat << 'ENVEOF' > .env
-      ERPNEXT_VERSION=v15.0.0
-      FRAPPE_VERSION=v15.0.0
-      MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!
-      ADMIN_PASSWORD=AdminStrongErpPassword2026!
-      SITES=frontend
-      ENVEOF
-
-        docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
-
-        echo "[*] Esperando disponibilidad de MariaDB..."
-        for i in {1..30}; do
-          if docker compose --project-name erpnext exec -T mariadb mysqladmin ping -h localhost -u root --password=AdminStrongRootPassword2026! >/dev/null 2>&1; then
-            echo "[OK] MariaDB operativa."
-            break
-          fi
-          sleep 3
-        done
-
-        if [ ! -d "/opt/frappe_docker/sites/frontend" ]; then
-          echo "[*] Creando sitio base 'frontend' con ERPNext (toma ~5 minutos)..."
-          docker compose --project-name erpnext exec -T backend bench new-site frontend \
-            --mariadb-root-password AdminStrongRootPassword2026! \
-            --admin-password AdminStrongErpPassword2026! \
-            --install-app erpnext \
-            --set-default
-          echo "[OK] Sitio ERPNext inicializado."
-        else
-          echo "[*] Sitio 'frontend' ya existe; omitiendo creación."
-        fi
-      fi
-      EOF
-
-      # Inyección de variables
-      sed -i "s|__AWS_REGION__|${{ env.AWS_REGION }}|g" deploy_remote.sh
-      sed -i "s|__ECR_REG__|${ECR_REG}|g" deploy_remote.sh
-      sed -i "s|__IMAGE_TAG__|${IMAGE_TAG}|g" deploy_remote.sh
-      sed -i "s|__ERP_HOST__|${ERP_HOST}|g" deploy_remote.sh
-      sed -i "s|__ERP_TARGET__|${ERP_TARGET}|g" deploy_remote.sh
-      sed -i "s|__COMPOSE_B64__|${COMPOSE_B64}|g" deploy_remote.sh
-
-      SCRIPT_B64=$(base64 -w 0 deploy_remote.sh)
-
-      echo "[*] Despachando despliegue desatendido vía AWS SSM..."
-      COMMAND_ID=$(aws ssm send-command \
-        --instance-ids "$INSTANCE_ID" \
-        --document-name "AWS-RunShellScript" \
-        --timeout-seconds 900 \
-        --parameters commands="[\"echo '$SCRIPT_B64' | base64 -d | bash\"]" \
-        --query "Command.CommandId" \
-        --output text)
-
-      echo "[*] Esperando finalización del comando $COMMAND_ID..."
-      aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" || true
-
-      echo "=== STDOUT DEL COMANDO ==="
-      aws ssm get-command-invocation \
-        --command-id "$COMMAND_ID" \
-        --instance-id "$INSTANCE_ID" \
-        --query "StandardOutputContent" \
-        --output text || true
-
-      echo "=== STDERR DEL COMANDO ==="
-      aws ssm get-command-invocation \
-        --command-id "$COMMAND_ID" \
-        --instance-id "$INSTANCE_ID" \
-        --query "StandardErrorContent" \
-        --output text || true
-
-      STATUS=$(aws ssm get-command-invocation \
-        --command-id "$COMMAND_ID" \
-        --instance-id "$INSTANCE_ID" \
-        --query "Status" \
-        --output text)
-
-      [ "$STATUS" = "Success" ] || exit 1
-
-      - name: Smoke Tests en Vivo
         run: |
-          PUBLIC_IP="${{ needs.provision-infra.outputs.public_ip }}"
-          echo "[*] Probando persistencia en EC2 (/ready)..."
-          curl --fail --retry 10 --retry-delay 5 "http://${PUBLIC_IP}/ready"
-          
-          echo "[*] Probando inferencia conversacional con Bedrock..."
-          curl --fail -X POST "http://${PUBLIC_IP}/api/v1/chat" \
-            -H "Content-Type: application/json" \
-            -d '{"session_id":"smoke-test-ec2","message":"Hola"}'
+          INSTANCE_ID="${{ needs.provision-infra.outputs.instance_id }}"
+          ECR_REG="${{ needs.provision-infra.outputs.ecr_registry }}"
+          IMAGE_TAG="${{ env.IMAGE_TAG }}"
+          ERP_TARGET="${{ github.event.inputs.erp_target || 'cloud' }}"
+          ERP_HOST="${{ github.event.inputs.erp_target == 'cloud' && 'host.docker.internal:8080' || github.event.inputs.onprem_ip }}"
+          COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
+
+          cat << 'EOF' > deploy_remote.sh
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          echo "[1/4] Instalando dependencias base..."
+          dnf install -y docker git
+          systemctl enable --now docker
+
+          echo "[2/4] Verificando Docker Compose CLI plugin..."
+          if ! docker compose version >/dev/null 2>&1; then
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          fi
+
+          echo "[3/4] Desplegando Stack del Agente IA..."
+          aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __ECR_REG__
+          mkdir -p /opt/simpledso
+          echo '__COMPOSE_B64__' | base64 -d > /opt/simpledso/docker-compose.yml
+          cd /opt/simpledso
+          export ECR_REGISTRY=__ECR_REG__
+          export IMAGE_TAG=__IMAGE_TAG__
+          export ERP_HOST=__ERP_HOST__
+          docker compose pull
+          docker compose up -d --remove-orphans
+
+          if [ "__ERP_TARGET__" = "cloud" ]; then
+            echo "[4/4] Desplegando Stack de ERPNext (frappe_docker)..."
+            if [ ! -d "/opt/frappe_docker" ]; then
+              git clone https://github.com/frappe/frappe_docker.git /opt/frappe_docker
+            fi
+            cd /opt/frappe_docker
+
+            cat << 'ENVEOF' > .env
+          ERPNEXT_VERSION=v15.0.0
+          FRAPPE_VERSION=v15.0.0
+          MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!
+          ADMIN_PASSWORD=AdminStrongErpPassword2026!
+          SITES=frontend
+          ENVEOF
+
+            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
+
+            echo "[*] Esperando disponibilidad de MariaDB..."
+            for i in {1..30}; do
+              if docker compose --project-name erpnext exec -T mariadb mysqladmin ping -h localhost -u root --password=AdminStrongRootPassword2026! >/dev/null 2>&1; then
+                echo "[OK] MariaDB operativa."
+                break
+              fi
+              sleep 3
+            done
+
+            if [ ! -d "/opt/frappe_docker/sites/frontend" ]; then
+              echo "[*] Creando sitio base 'frontend' con ERPNext (toma ~5 minutos)..."
+              docker compose --project-name erpnext exec -T backend bench new-site frontend \
+                --mariadb-root-password AdminStrongRootPassword2026! \
+                --admin-password AdminStrongErpPassword2026! \
+                --install-app erpnext \
+                --set-default
+              echo "[OK] Sitio ERPNext inicializado."
+            else
+              echo "[*] Sitio 'frontend' ya existe; omitiendo creación."
+            fi
+          fi
+          EOF
+
+          # Inyección de variables
+          sed -i "s|__AWS_REGION__|${{ env.AWS_REGION }}|g" deploy_remote.sh
+          sed -i "s|__ECR_REG__|${ECR_REG}|g" deploy_remote.sh
+          sed -i "s|__IMAGE_TAG__|${IMAGE_TAG}|g" deploy_remote.sh
+          sed -i "s|__ERP_HOST__|${ERP_HOST}|g" deploy_remote.sh
+          sed -i "s|__ERP_TARGET__|${ERP_TARGET}|g" deploy_remote.sh
+          sed -i "s|__COMPOSE_B64__|${COMPOSE_B64}|g" deploy_remote.sh
+
+          SCRIPT_B64=$(base64 -w 0 deploy_remote.sh)
+
+          echo "[*] Despachando despliegue desatendido vía AWS SSM..."
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --timeout-seconds 900 \
+            --parameters commands="[\"echo '$SCRIPT_B64' | base64 -d | bash\"]" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "[*] Esperando finalización del comando $COMMAND_ID..."
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" || true
+
+          echo "=== STDOUT DEL COMANDO ==="
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query "StandardOutputContent" \
+            --output text || true
+
+          echo "=== STDERR DEL COMANDO ==="
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query "StandardErrorContent" \
+            --output text || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query "Status" \
+            --output text)
+
+          [ "$STATUS" = "Success" ] || exit 1
+
+          - name: Smoke Tests en Vivo
+            run: |
+              PUBLIC_IP="${{ needs.provision-infra.outputs.public_ip }}"
+              echo "[*] Probando persistencia en EC2 (/ready)..."
+              curl --fail --retry 10 --retry-delay 5 "http://${PUBLIC_IP}/ready"
+              
+              echo "[*] Probando inferencia conversacional con Bedrock..."
+              curl --fail -X POST "http://${PUBLIC_IP}/api/v1/chat" \
+                -H "Content-Type: application/json" \
+                -d '{"session_id":"smoke-test-ec2","message":"Hola"}'
