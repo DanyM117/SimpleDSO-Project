@@ -283,11 +283,12 @@ jobs:
         run: |
           PUBLIC_IP="${{ needs.provision-infra.outputs.public_ip }}"
           
-          echo "[*] Test 1: Validando ERPNext UI (GET /)..."
-          curl --fail --retry 10 --retry-delay 5 "http://${PUBLIC_IP}/" >/dev/null
-
-          echo "[*] Test 2: Validando Healthcheck Agente (GET /ready)..."
+          echo "[*] Test 1: Validando Healthcheck del Agente IA (GET /ready)..."
           curl --fail --retry 10 --retry-delay 5 "http://${PUBLIC_IP}/ready"
+
+          echo "[*] Test 2: Validando ERPNext UI simulando subdominio Tenant (GET /)..."
+          # Inyectamos el header Host para que Nginx lo envíe a Frappe/ERPNext
+          curl --fail --retry 10 --retry-delay 5 -H "Host: api.erp.internal" "http://${PUBLIC_IP}/" >/dev/null
 
           echo "[*] Test 3: Validando Inferencia Claude en Bedrock (POST /api/v1/chat)..."
           curl --fail -X POST "http://${PUBLIC_IP}/api/v1/chat" \
