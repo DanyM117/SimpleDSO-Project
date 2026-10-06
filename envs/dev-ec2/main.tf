@@ -53,15 +53,24 @@ resource "aws_route_table_association" "public" {
 }
 
 # 2. Security Group Perimetral (Solo Puerto 80 para Nginx; administracion via SSM)
+# 2. Security Group Perimetral (Solo Puerto 80 para Nginx; administracion via SSM)
 resource "aws_security_group" "monolith_sg" {
   name        = "simpledso-monolith-sg"
   description = "Trafico HTTP unificado para Nginx; administracion exclusiva por SSM"
-  vpc_id      = aws_vpc.monolith_vpc.id  # <-- Corregido: apunta a aws_vpc.monolith_vpc.id
+  vpc_id      = aws_vpc.monolith_vpc.id
 
   ingress {
-    description = "HTTP unificado publico (Nginx -> Agente IA y ERPNext)"
+    description = "HTTP unificado publico (Nginx a Agente IA y ERPNext)" # <-- Se reemplazo '->' por 'a'
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS publico"
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
