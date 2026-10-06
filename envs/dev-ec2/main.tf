@@ -5,11 +5,13 @@ data "aws_ami" "amazon_linux_arm" {
   owners      = ["137112412989"]
   filter {
     name   = "name"
-    values = ["al2023-ami-2023.*-kernel-*-arm64"]
+    # CAMBIO: Usar x86_64 en lugar de arm64
+    values = ["al2023-ami-2023.*-kernel-*-x86_64"] 
   }
   filter {
     name   = "architecture"
-    values = ["arm64"]
+    # CAMBIO: Arquitectura x86_64
+    values = ["x86_64"] 
   }
 }
 
@@ -149,7 +151,7 @@ resource "aws_ecr_repository" "agent_repo" {
 # 5. Instancia EC2 Unificada (Dimensionamiento Dinamico segun ERP)
 resource "aws_instance" "monolith" {
   ami                    = data.aws_ami.amazon_linux_arm.id
-  instance_type          = var.erp_target == "cloud" ? "t4g.large" : "t4g.small"
+  instance_type          = var.erp_target == "cloud" ? "t3.large" : "t3.small"
   subnet_id              = aws_subnet.public.id
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   vpc_security_group_ids = [aws_security_group.monolith_sg.id]
