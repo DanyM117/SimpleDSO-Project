@@ -54,7 +54,7 @@ resource "aws_route_table_association" "public" {
 
 resource "aws_security_group" "monolith_sg" {
   name        = "simpledso-monolith-sg"
-  vpc_id      = aws_vpc.monolith_vpc.vpc_id
+  vpc_id      = aws_vpc.monolith_vpc.id
 
   ingress {
     description = "Trafico HTTP unificado (Nginx -> Agente IA y ERPNext)"
