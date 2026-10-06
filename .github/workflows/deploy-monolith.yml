@@ -149,7 +149,41 @@ jobs:
           INSTANCE_ID="${{ needs.provision-infra.outputs.instance_id }}"
           ECR_REG="${{ needs.provision-infra.outputs.ecr_registry }}"
           IMAGE_TAG="${{ env.IMAGE_TAG }}"
-          ERP_TARGET="${{ github.event.inputs.erp_target || 'cloud' }}"
+          if [ "__ERP_TARGET__" = "cloud" ]; then
+            echo "[3/4] Desplegando Stack de ERPNext (Producción Multi-tenant)..."
+            if [ ! -d "/opt/frappe_docker" ]; then
+              git clone https://github.com/frappe/frappe_docker.git /opt/frappe_docker
+            fi
+            cd /opt/frappe_docker
+            
+            # Generar entorno de producción
+            cat << 'ENVEOF' > .env
+            ERPNEXT_VERSION=v15.0.0
+            FRAPPE_VERSION=v15.0.0
+            MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!
+            ADMIN_PASSWORD=AdminStrongErpPassword2026!
+            SITES=api.erp.internal
+            ENVEOF
+
+            # Levantar stack de producción sin el Traefik interno
+            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml pull
+            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
+
+            echo "[*] Esperando inicialización de MariaDB y Backend (45s)..."
+            sleep 45 
+            
+            # Habilitar el enrutamiento Multi-tenant en la configuración global de Bench
+            docker compose --project-name erpnext exec -T backend bench config dns_multitenant on
+            
+            # Aprovisionar el sitio base (api.erp.internal) si no existe
+            if [ ! -d "sites/api.erp.internal" ]; then
+              echo "[*] Creando base de datos y esquema para el primer tenant..."
+              docker compose --project-name erpnext exec -T backend bench new-site api.erp.internal \
+                --mariadb-root-password AdminStrongRootPassword2026! \
+                --admin-password AdminStrongErpPassword2026!
+              docker compose --project-name erpnext exec -T backend bench --site api.erp.internal install-app erpnext
+            fi
+          fi
           ERP_HOST="host.docker.internal:8080"
           
           COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
@@ -196,7 +230,7 @@ jobs:
           echo '__NGINX_CONF_B64__' | base64 -d > /opt/simpledso/nginx/default.conf
           
           cd /opt/simpledso
-          export ECR_REGISTRY=__ECR_REG__
+          export ECR_REGISTRY="__ECR_REG__/simpledso-agent"
           export IMAGE_TAG=__IMAGE_TAG__
           export ERP_HOST=__ERP_HOST__
           docker compose pull agent-core
@@ -242,7 +276,7 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_ID" \
-            --query "StandardOutputContent" \
+            --query '{Salida:StandardOutputContent, Error:StandardErrorContent}' \
             --output text || true
 
           [ "$STATUS" = "Success" ] || exit 1
