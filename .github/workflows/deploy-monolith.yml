@@ -176,6 +176,7 @@ jobs:
               git clone https://github.com/frappe/frappe_docker.git /opt/frappe_docker
             fi
             cd /opt/frappe_docker
+            cp example.env .env
             docker compose -f pwd.yml up -d
 
             echo "[*] Esperando disponibilidad interna de ERPNext en puerto 8080..."
