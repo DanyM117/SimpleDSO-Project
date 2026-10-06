@@ -156,14 +156,12 @@ jobs:
             fi
             cd /opt/frappe_docker
             
-            # Generar entorno de producción
-            cat << 'ENVEOF' > .env
-            ERPNEXT_VERSION=v15.0.0
-            FRAPPE_VERSION=v15.0.0
-            MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!
-            ADMIN_PASSWORD=AdminStrongErpPassword2026!
-            SITES=api.erp.internal
-            ENVEOF
+            # Generar entorno de producción secuencialmente
+            echo "ERPNEXT_VERSION=v15.0.0" > .env
+            echo "FRAPPE_VERSION=v15.0.0" >> .env
+            echo "MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!" >> .env
+            echo "ADMIN_PASSWORD=AdminStrongErpPassword2026!" >> .env
+            echo "SITES=api.erp.internal" >> .env
 
             # Levantar stack de producción sin el Traefik interno
             docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml pull
