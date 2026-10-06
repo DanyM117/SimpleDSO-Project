@@ -52,37 +52,25 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# 2. Security Group Perimetral (Sin Puerto 22 SSH abierto)
 resource "aws_security_group" "monolith_sg" {
   name        = "simpledso-monolith-sg"
-  description = "Trafico web para el Agente y ERPNext; administracion exclusiva por SSM"
-  vpc_id      = aws_vpc.monolith_vpc.id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
-    description = "HTTP Publico (Agente / Webhook WhatsApp / ERP)"
+    description = "Trafico HTTP unificado (Nginx -> Agente IA y ERPNext)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "HTTPS Publico"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   egress {
-    description = "Salida total a Internet via IGW (Bedrock, ECR, actualizaciones)"
+    description = "Salida a internet para Bedrock, ECR y repositorios"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
-  tags = { Name = "simpledso-monolith-sg" }
 }
 
 # 3. Rol IAM e Instance Profile (Bedrock + SSM + ECR)
