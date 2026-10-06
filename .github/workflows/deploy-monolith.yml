@@ -248,7 +248,7 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --timeout-seconds 900 \
+            --timeout-seconds 1800 \
             --parameters commands="[\"echo '$SCRIPT_B64' | base64 -d | bash\"]" \
             --query "Command.CommandId" \
             --output text)
@@ -265,8 +265,8 @@ jobs:
               --instance-id "$INSTANCE_ID" \
               --query "Status" \
               --output text 2>/dev/null || echo "InProgress")
-            echo "[-] Estado: $STATUS (${ELAPSED}s / 600s)..."
-            [ $ELAPSED -ge 600 ] && break
+            echo "[-] Estado: $STATUS (${ELAPSED}s / 1800s)..."
+            [ $ELAPSED -ge 1800 ] && break
           done
 
           aws ssm get-command-invocation \
