@@ -180,42 +180,27 @@ jobs:
           docker compose up -d --remove-orphans
 
           if [ "__ERP_TARGET__" = "cloud" ]; then
-            echo "[4/4] Desplegando Stack de ERPNext (frappe_docker)..."
+            echo "[4/4] Desplegando Stack de ERPNext mediante pwd.yml..."
             if [ ! -d "/opt/frappe_docker" ]; then
               git clone https://github.com/frappe/frappe_docker.git /opt/frappe_docker
             fi
             cd /opt/frappe_docker
 
-            cat << 'ENVEOF' > .env
-          ERPNEXT_VERSION=v15.0.0
-          FRAPPE_VERSION=v15.0.0
-          MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!
-          ADMIN_PASSWORD=AdminStrongErpPassword2026!
-          SITES=frontend
-          ENVEOF
+            # 1. Detener cualquier contenedor huérfano previo
+            docker compose down --remove-orphans || true
 
-            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
+            # 2. Levantar el stack monolítico completo
+            docker compose -f pwd.yml up -d
 
-            echo "[*] Esperando disponibilidad de MariaDB..."
-            for i in {1..30}; do
-              if docker compose --project-name erpnext exec -T mariadb mysqladmin ping -h localhost -u root --password=AdminStrongRootPassword2026! >/dev/null 2>&1; then
-                echo "[OK] MariaDB operativa."
+            # 3. Esperar a que el frontend responda HTTP 200 en el puerto 8080
+            echo "[*] Esperando a que el panel web de ERPNext esté disponible..."
+            for i in {1..40}; do
+              if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 | grep -q "200\|302"; then
+                echo "[OK] ERPNext operativo en el puerto 8080."
                 break
               fi
-              sleep 3
+              sleep 5
             done
-
-            if [ ! -d "/opt/frappe_docker/sites/frontend" ]; then
-              echo "[*] Creando sitio base 'frontend' con ERPNext (toma ~5 minutos)..."
-              docker compose --project-name erpnext exec -T backend bench new-site frontend \
-                --mariadb-root-password AdminStrongRootPassword2026! \
-                --admin-password AdminStrongErpPassword2026! \
-                --install-app erpnext \
-                --set-default
-              echo "[OK] Sitio ERPNext inicializado."
-            else
-              echo "[*] Sitio 'frontend' ya existe; omitiendo creación."
-            fi
           fi
           EOF
 
