@@ -149,40 +149,14 @@ jobs:
           INSTANCE_ID="${{ needs.provision-infra.outputs.instance_id }}"
           ECR_REG="${{ needs.provision-infra.outputs.ecr_registry }}"
           IMAGE_TAG="${{ env.IMAGE_TAG }}"
-          if [ "__ERP_TARGET__" = "cloud" ]; then
-            echo "[3/4] Desplegando Stack de ERPNext (Producción Multi-tenant)..."
-            if [ ! -d "/opt/frappe_docker" ]; then
-              git clone https://github.com/frappe/frappe_docker.git /opt/frappe_docker
-            fi
-            cd /opt/frappe_docker
-            
-            # Generar entorno de producción secuencialmente
-            echo "ERPNEXT_VERSION=v15.0.0" > .env
-            echo "FRAPPE_VERSION=v15.0.0" >> .env
-            echo "MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!" >> .env
-            echo "ADMIN_PASSWORD=AdminStrongErpPassword2026!" >> .env
-            echo "SITES=api.erp.internal" >> .env
+          ERP_TARGET="${{ github.event.inputs.erp_target || 'cloud' }}"
 
-            # Levantar stack de producción sin el Traefik interno
-            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml pull
-            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
-
-            echo "[*] Esperando inicialización de MariaDB y Backend (45s)..."
-            sleep 45 
-            
-            # Habilitar el enrutamiento Multi-tenant en la configuración global de Bench
-            docker compose --project-name erpnext exec -T backend bench config dns_multitenant on
-            
-            # Aprovisionar el sitio base (api.erp.internal) si no existe
-            if [ ! -d "sites/api.erp.internal" ]; then
-              echo "[*] Creando base de datos y esquema para el primer tenant..."
-              docker compose --project-name erpnext exec -T backend bench new-site api.erp.internal \
-                --mariadb-root-password AdminStrongRootPassword2026! \
-                --admin-password AdminStrongErpPassword2026!
-              docker compose --project-name erpnext exec -T backend bench --site api.erp.internal install-app erpnext
-            fi
+          # Lógica para inyectar la IP correcta según el Target
+          if [ "$ERP_TARGET" = "onpremise" ]; then
+            ERP_HOST="${{ github.event.inputs.onprem_ip }}:80"
+          else
+            ERP_HOST="host.docker.internal:8080"
           fi
-          ERP_HOST="host.docker.internal:8080"
           
           COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
           NGINX_CONF_B64=$(base64 -w 0 nginx/default.conf)
@@ -203,22 +177,47 @@ jobs:
           fi
 
           if [ "__ERP_TARGET__" = "cloud" ]; then
-            echo "[3/4] Desplegando Stack de ERPNext con pwd.yml..."
+            echo "[3/4] Desplegando Stack de ERPNext (Producción Multi-tenant)..."
             if [ ! -d "/opt/frappe_docker" ]; then
               git clone https://github.com/frappe/frappe_docker.git /opt/frappe_docker
             fi
             cd /opt/frappe_docker
-            cp example.env .env
-            docker compose -f pwd.yml up -d
+            
+            # Generar entorno de producción secuencialmente
+            echo "ERPNEXT_VERSION=v15.0.0" > .env
+            echo "FRAPPE_VERSION=v15.0.0" >> .env
+            echo "MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!" >> .env
+            echo "ADMIN_PASSWORD=AdminStrongErpPassword2026!" >> .env
+            echo "SITES=api.erp.internal" >> .env
 
-            echo "[*] Esperando disponibilidad interna de ERPNext en puerto 8080..."
-            for i in {1..30}; do
-              if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 | grep -q "200\|302"; then
-                echo "[OK] ERPNext en línea."
+            # Levantar stack de producción sin el Traefik interno
+            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml pull
+            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
+
+            echo "[*] Esperando disponibilidad de MariaDB..."
+            for i in {1..15}; do
+              if docker compose --project-name erpnext exec -T mariadb mysqladmin ping -h localhost -u root --password=AdminStrongRootPassword2026! >/dev/null 2>&1; then
+                echo "[OK] MariaDB está en línea."
                 break
               fi
-              sleep 4
+              echo "Esperando a la base de datos... ($i/15)"
+              sleep 5
             done
+            
+            # Habilitar el enrutamiento Multi-tenant
+            docker compose --project-name erpnext exec -T backend bench config dns_multitenant on
+            
+            # Verificar si el tenant ya existe DENTRO del volumen de docker
+            if ! docker compose --project-name erpnext exec -T backend ls sites/api.erp.internal > /dev/null 2>&1; then
+              echo "[*] Creando base de datos y esquema para api.erp.internal (tomará ~5 mins)..."
+              docker compose --project-name erpnext exec -T backend bench new-site api.erp.internal \
+                --mariadb-root-password AdminStrongRootPassword2026! \
+                --admin-password AdminStrongErpPassword2026! \
+                --install-app erpnext \
+                --set-default
+            else
+              echo "[*] El tenant api.erp.internal ya existe en el volumen. Omitiendo aprovisionamiento."
+            fi
           fi
 
           echo "[4/4] Desplegando Nginx Proxy y Agente IA..."
@@ -229,8 +228,8 @@ jobs:
           
           cd /opt/simpledso
           export ECR_REGISTRY="__ECR_REG__/simpledso-agent"
-          export IMAGE_TAG=__IMAGE_TAG__
-          export ERP_HOST=__ERP_HOST__
+          export IMAGE_TAG="__IMAGE_TAG__"
+          export ERP_HOST="__ERP_HOST__"
           docker compose pull agent-core
           docker compose up -d --remove-orphans
           EOF
@@ -278,7 +277,6 @@ jobs:
             --output text || true
 
           [ "$STATUS" = "Success" ] || exit 1
-
       - name: Smoke Tests en Vivo (Puerto 80 Unificado)
         run: |
           PUBLIC_IP="${{ needs.provision-infra.outputs.public_ip }}"
