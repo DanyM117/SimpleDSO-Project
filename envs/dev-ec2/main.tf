@@ -52,9 +52,11 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# 2. Security Group Perimetral (Solo Puerto 80 para Nginx; administracion via SSM)
 resource "aws_security_group" "monolith_sg" {
   name        = "simpledso-monolith-sg"
-  vpc_id      = module.vpc.vpc_id
+  description = "Trafico HTTP unificado para Nginx; administracion exclusiva por SSM"
+  vpc_id      = aws_vpc.monolith_vpc.id  # <-- Corregido: apunta a aws_vpc.monolith_vpc.id
 
   ingress {
     description = "HTTP unificado publico (Nginx -> Agente IA y ERPNext)"
@@ -65,16 +67,14 @@ resource "aws_security_group" "monolith_sg" {
   }
 
   egress {
-    description = "Salida HTTPS completa para AWS Bedrock, ECR y DNF"
+    description = "Salida total a Internet via IGW (Bedrock, ECR, DNF)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name = "simpledso-monolith-sg"
-  }
+  tags = { Name = "simpledso-monolith-sg" }
 }
 
 # 3. Rol IAM e Instance Profile (Bedrock + SSM + ECR)

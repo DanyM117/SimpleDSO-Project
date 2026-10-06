@@ -248,7 +248,7 @@ jobs:
 
       - name: Smoke Tests en Vivo (Puerto 80 Unificado)
         run: |
-          PUBLIC_IP="${{ needs.provision-infra.outputs.instance_public_ip }}"
+          PUBLIC_IP="${{ needs.provision-infra.outputs.public_ip }}"
           
           echo "[*] Test 1: Validando ERPNext UI (GET /)..."
           curl --fail --retry 10 --retry-delay 5 "http://${PUBLIC_IP}/" >/dev/null
