@@ -176,11 +176,9 @@ jobs:
               git clone https://github.com/frappe/frappe_docker.git /opt/frappe_docker
             fi
             cd /opt/frappe_docker
-            
-            # Levanta el stack autocontenido de ERPNext (MariaDB, Redis, Web)
             docker compose -f pwd.yml up -d
 
-            echo "[*] Esperando a que ERPNext responda internamente en el puerto 8080..."
+            echo "[*] Esperando disponibilidad interna de ERPNext en puerto 8080..."
             for i in {1..30}; do
               if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 | grep -q "200\|302"; then
                 echo "[OK] ERPNext en línea."
@@ -190,7 +188,7 @@ jobs:
             done
           fi
 
-          echo "[4/4] Desplegando Nginx Reverse Proxy y Agente IA..."
+          echo "[4/4] Desplegando Nginx Proxy y Agente IA..."
           aws ecr get-login-password --region __AWS_REGION__ | docker login --username AWS --password-stdin __ECR_REG__
           mkdir -p /opt/simpledso/nginx
           echo '__COMPOSE_B64__' | base64 -d > /opt/simpledso/docker-compose.yml
@@ -204,7 +202,6 @@ jobs:
           docker compose up -d --remove-orphans
           EOF
 
-          # Sustitución de variables en el script
           sed -i "s|__AWS_REGION__|${{ env.AWS_REGION }}|g" deploy_remote.sh
           sed -i "s|__ECR_REG__|${ECR_REG}|g" deploy_remote.sh
           sed -i "s|__IMAGE_TAG__|${IMAGE_TAG}|g" deploy_remote.sh
@@ -224,7 +221,7 @@ jobs:
             --query "Command.CommandId" \
             --output text)
 
-          echo "[*] Monitoreando ejecución remota (Command ID: $COMMAND_ID)..."
+          echo "[*] Monitoreando Command ID: $COMMAND_ID vía polling..."
           STATUS="InProgress"
           ELAPSED=0
           while [[ "$STATUS" == "InProgress" || "$STATUS" == "Pending" ]]; do
@@ -236,7 +233,7 @@ jobs:
               --instance-id "$INSTANCE_ID" \
               --query "Status" \
               --output text 2>/dev/null || echo "InProgress")
-            echo "[-] Estado: $STATUS (${ELAPSED}s)..."
+            echo "[-] Estado: $STATUS (${ELAPSED}s / 600s)..."
             [ $ELAPSED -ge 600 ] && break
           done
 
@@ -253,13 +250,13 @@ jobs:
         run: |
           PUBLIC_IP="${{ needs.provision-infra.outputs.instance_public_ip }}"
           
-          echo "[*] Test 1: Validando proxy inverso hacia ERPNext (GET /)..."
+          echo "[*] Test 1: Validando ERPNext UI (GET /)..."
           curl --fail --retry 10 --retry-delay 5 "http://${PUBLIC_IP}/" >/dev/null
 
-          echo "[*] Test 2: Validando health check del Agente (GET /ready)..."
+          echo "[*] Test 2: Validando Healthcheck Agente (GET /ready)..."
           curl --fail --retry 10 --retry-delay 5 "http://${PUBLIC_IP}/ready"
 
-          echo "[*] Test 3: Validando inferencia Bedrock (POST /api/v1/chat)..."
+          echo "[*] Test 3: Validando Inferencia Claude en Bedrock (POST /api/v1/chat)..."
           curl --fail -X POST "http://${PUBLIC_IP}/api/v1/chat" \
             -H "Content-Type: application/json" \
             -d '{"session_id": "smoke-test-nginx", "message": "Hola"}'

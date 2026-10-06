@@ -54,10 +54,10 @@ resource "aws_route_table_association" "public" {
 
 resource "aws_security_group" "monolith_sg" {
   name        = "simpledso-monolith-sg"
-  vpc_id      = aws_vpc.monolith_vpc.id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
-    description = "Trafico HTTP unificado (Nginx -> Agente IA y ERPNext)"
+    description = "HTTP unificado publico (Nginx -> Agente IA y ERPNext)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -65,11 +65,15 @@ resource "aws_security_group" "monolith_sg" {
   }
 
   egress {
-    description = "Salida a internet para Bedrock, ECR y repositorios"
+    description = "Salida HTTPS completa para AWS Bedrock, ECR y DNF"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "simpledso-monolith-sg"
   }
 }
 
