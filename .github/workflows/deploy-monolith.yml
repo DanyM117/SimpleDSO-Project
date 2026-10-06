@@ -180,7 +180,8 @@ jobs:
           echo "[2/4] Verificando Docker Compose CLI plugin..."
           if ! docker compose version >/dev/null 2>&1; then
             mkdir -p /usr/local/lib/docker/cli-plugins
-            curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            # Descarga dinámica según la arquitectura del procesador (x86_64 o aarch64)
+            curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose
             chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
           fi
 
