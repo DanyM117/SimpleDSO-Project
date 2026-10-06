@@ -165,6 +165,14 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
 
+          echo "[0/4] Configurando 4GB de memoria Swap para evitar bloqueos (OOM)..."
+          if [ ! -f /swapfile ]; then
+            fallocate -l 4G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+          fi
+
           echo "[1/4] Instalando dependencias base..."
           dnf install -y docker git
           systemctl enable --now docker
@@ -183,31 +191,28 @@ jobs:
             fi
             cd /opt/frappe_docker
             
-            # Generar entorno de producción secuencialmente
             echo "ERPNEXT_VERSION=v15.0.0" > .env
             echo "FRAPPE_VERSION=v15.0.0" >> .env
             echo "MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!" >> .env
             echo "ADMIN_PASSWORD=AdminStrongErpPassword2026!" >> .env
             echo "SITES=api.erp.internal" >> .env
 
-            # Levantar stack de producción sin el Traefik interno
             docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml pull
             docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
 
             echo "[*] Esperando disponibilidad de MariaDB..."
-            for i in {1..15}; do
+            # Aumentamos a 40 intentos (200 segundos) para tolerar el inicio en frío con memoria Swap
+            for i in {1..40}; do
               if docker compose --project-name erpnext exec -T mariadb mysqladmin ping -h localhost -u root --password=AdminStrongRootPassword2026! >/dev/null 2>&1; then
                 echo "[OK] MariaDB está en línea."
                 break
               fi
-              echo "Esperando a la base de datos... ($i/15)"
+              echo "Esperando a la base de datos... ($i/40)"
               sleep 5
             done
             
-            # Habilitar el enrutamiento Multi-tenant
             docker compose --project-name erpnext exec -T backend bench config dns_multitenant on
             
-            # Verificar si el tenant ya existe DENTRO del volumen de docker
             if ! docker compose --project-name erpnext exec -T backend ls sites/api.erp.internal > /dev/null 2>&1; then
               echo "[*] Creando base de datos y esquema para api.erp.internal (tomará ~5 mins)..."
               docker compose --project-name erpnext exec -T backend bench new-site api.erp.internal \
