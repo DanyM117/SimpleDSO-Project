@@ -178,18 +178,14 @@ jobs:
           systemctl enable --now docker
 
           echo "[2/4] Instalando Docker Compose de forma segura..."
-          # 1. Limpiar cualquier binario corrupto o página HTML descargada previamente
           rm -f /usr/local/lib/docker/cli-plugins/docker-compose
           rm -f /usr/libexec/docker/cli-plugins/docker-compose
-          
           mkdir -p /usr/local/lib/docker/cli-plugins
           mkdir -p /usr/libexec/docker/cli-plugins
           
-          # 2. Forzar descarga de una versión estable con flag -f para abortar si hay error HTTP
           curl -fsSL "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
           chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
           
-          # 3. Crear enlaces simbólicos en las rutas nativas de Amazon Linux 2023
           ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
           ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
 
@@ -200,7 +196,6 @@ jobs:
             fi
             cd /opt/frappe_docker
             
-            # CORRECCIÓN: Unificamos DB_PASSWORD al root real esperado
             echo "ERPNEXT_VERSION=v15.0.0" > .env
             echo "FRAPPE_VERSION=v15.0.0" >> .env
             echo "DB_PASSWORD=AdminStrongRootPassword2026!" >> .env 
@@ -233,7 +228,7 @@ jobs:
             docker compose --project-name erpnext exec -T backend bench config dns_multitenant on
             
             if ! docker compose --project-name erpnext exec -T backend ls sites/api.erp.internal > /dev/null 2>&1; then
-              echo "[*] Creando esquema para api.erp.internal (tomará entre 10 y 20 minutos)..."
+              echo "[*] Creando esquema para api.erp.internal..."
               docker compose --project-name erpnext exec -T backend bench new-site api.erp.internal \
                 --mariadb-root-password AdminStrongRootPassword2026! \
                 --admin-password AdminStrongErpPassword2026! \
@@ -250,7 +245,7 @@ jobs:
           mkdir -p /opt/simpledso/nginx
           echo '__COMPOSE_B64__' | base64 -d > /opt/simpledso/docker-compose.yml
           echo '__NGINX_CONF_B64__' | base64 -d > /opt/simpledso/nginx/default.conf
-
+          
           cd /opt/simpledso
           export ECR_REGISTRY="__ECR_REG__/simpledso-agent"
           export IMAGE_TAG="__IMAGE_TAG__"
