@@ -191,12 +191,11 @@ jobs:
             fi
             cd /opt/frappe_docker
             
-            # Variables de entorno CRÍTICAS para que MariaDB inicialice correctamente
+            # CORRECCIÓN: Unificamos DB_PASSWORD al root real esperado
             echo "ERPNEXT_VERSION=v15.0.0" > .env
             echo "FRAPPE_VERSION=v15.0.0" >> .env
-            echo "MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!" >> .env
+            echo "DB_PASSWORD=AdminStrongRootPassword2026!" >> .env 
             echo "ADMIN_PASSWORD=AdminStrongErpPassword2026!" >> .env
-            echo "DB_PASSWORD=AdminStrongErpPassword2026!" >> .env # Requerido por compose.mariadb.yaml
             echo "SITES=api.erp.internal" >> .env
 
             export COMPOSE_FILES="-f compose.yaml -f overrides/compose.noproxy.yaml -f overrides/compose.mariadb.yaml -f overrides/compose.redis.yaml"
@@ -207,7 +206,6 @@ jobs:
             echo "[*] Esperando disponibilidad de MariaDB..."
             DB_READY=0
             for i in {1..40}; do
-              # Validar usando docker exec directamente sobre el contenedor db
               if docker compose --project-name erpnext exec -T db mariadb -u root -p'AdminStrongRootPassword2026!' -e "SELECT 1;" >/dev/null 2>&1; then
                 DB_READY=1
                 echo "[OK] MariaDB está en línea y aceptando conexiones."
@@ -218,8 +216,7 @@ jobs:
             done
             
             if [ "$DB_READY" -eq 0 ]; then
-              echo "[ERROR] El contenedor de MariaDB no inició o está en crash-loop. Abortando."
-              # Imprimir los logs de MariaDB para diagnóstico antes de salir
+              echo "[ERROR] El contenedor de MariaDB no inició o rechazó la conexión. Abortando."
               docker compose --project-name erpnext logs db
               exit 1
             fi
