@@ -242,7 +242,7 @@ jobs:
           mkdir -p /opt/simpledso/nginx
           echo '__COMPOSE_B64__' | base64 -d > /opt/simpledso/docker-compose.yml
           echo '__NGINX_CONF_B64__' | base64 -d > /opt/simpledso/nginx/default.conf
-          
+
           cd /opt/simpledso
           export ECR_REGISTRY="__ECR_REG__/simpledso-agent"
           export IMAGE_TAG="__IMAGE_TAG__"
