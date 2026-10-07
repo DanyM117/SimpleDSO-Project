@@ -173,13 +173,17 @@ jobs:
             swapon /swapfile
           fi
 
-          echo "[1/4] Instalando dependencias base y Docker Compose..."
-          # Agregamos docker-compose-plugin directamente en la instalación con dnf
-          dnf install -y docker docker-compose-plugin git
+          echo "[1/4] Instalando dependencias base..."
+          dnf install -y docker git
           systemctl enable --now docker
 
-          # Eliminamos el paso [2/4] que descargaba el binario con curl
-          # ya que dnf instaló la versión correcta y nativa para la arquitectura de la instancia.
+          echo "[2/4] Verificando Docker Compose CLI plugin..."
+          if ! docker compose version >/dev/null 2>&1; then
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            # Forzamos la descarga explícita para la arquitectura x86_64
+            curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          fi
 
           if [ "__ERP_TARGET__" = "cloud" ]; then
             echo "[3/4] Desplegando Stack de ERPNext (Producción Multi-tenant)..."
