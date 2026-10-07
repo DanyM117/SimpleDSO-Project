@@ -180,7 +180,6 @@ jobs:
           echo "[2/4] Verificando Docker Compose CLI plugin..."
           if ! docker compose version >/dev/null 2>&1; then
             mkdir -p /usr/local/lib/docker/cli-plugins
-            # Descarga dinámica según la arquitectura del procesador (x86_64 o aarch64)
             curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose
             chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
           fi
@@ -192,33 +191,47 @@ jobs:
             fi
             cd /opt/frappe_docker
             
+            # Variables de entorno CRÍTICAS para que MariaDB inicialice correctamente
             echo "ERPNEXT_VERSION=v15.0.0" > .env
             echo "FRAPPE_VERSION=v15.0.0" >> .env
             echo "MARIADB_ROOT_PASSWORD=AdminStrongRootPassword2026!" >> .env
             echo "ADMIN_PASSWORD=AdminStrongErpPassword2026!" >> .env
+            echo "DB_PASSWORD=AdminStrongErpPassword2026!" >> .env # Requerido por compose.mariadb.yaml
             echo "SITES=api.erp.internal" >> .env
 
-            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml pull
-            docker compose --project-name erpnext -f compose.yaml -f overrides/compose.noproxy.yaml up -d
+            export COMPOSE_FILES="-f compose.yaml -f overrides/compose.noproxy.yaml -f overrides/compose.mariadb.yaml -f overrides/compose.redis.yaml"
+
+            docker compose --project-name erpnext $COMPOSE_FILES pull
+            docker compose --project-name erpnext $COMPOSE_FILES up -d
 
             echo "[*] Esperando disponibilidad de MariaDB..."
-            # Aumentamos a 40 intentos (200 segundos) para tolerar el inicio en frío con memoria Swap
+            DB_READY=0
             for i in {1..40}; do
-              if docker compose --project-name erpnext exec -T mariadb mysqladmin ping -h localhost -u root --password=AdminStrongRootPassword2026! >/dev/null 2>&1; then
-                echo "[OK] MariaDB está en línea."
+              # Validar usando docker exec directamente sobre el contenedor db
+              if docker compose --project-name erpnext exec -T db mariadb -u root -p'AdminStrongRootPassword2026!' -e "SELECT 1;" >/dev/null 2>&1; then
+                DB_READY=1
+                echo "[OK] MariaDB está en línea y aceptando conexiones."
                 break
               fi
               echo "Esperando a la base de datos... ($i/40)"
               sleep 5
             done
             
+            if [ "$DB_READY" -eq 0 ]; then
+              echo "[ERROR] El contenedor de MariaDB no inició o está en crash-loop. Abortando."
+              # Imprimir los logs de MariaDB para diagnóstico antes de salir
+              docker compose --project-name erpnext logs db
+              exit 1
+            fi
+            
             docker compose --project-name erpnext exec -T backend bench config dns_multitenant on
             
             if ! docker compose --project-name erpnext exec -T backend ls sites/api.erp.internal > /dev/null 2>&1; then
-              echo "[*] Creando base de datos y esquema para api.erp.internal (tomará ~5 mins)..."
+              echo "[*] Creando esquema para api.erp.internal (tomará entre 10 y 20 minutos)..."
               docker compose --project-name erpnext exec -T backend bench new-site api.erp.internal \
                 --mariadb-root-password AdminStrongRootPassword2026! \
                 --admin-password AdminStrongErpPassword2026! \
+                --db-host db \
                 --install-app erpnext \
                 --set-default
             else
