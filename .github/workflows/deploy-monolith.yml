@@ -177,13 +177,21 @@ jobs:
           dnf install -y docker git
           systemctl enable --now docker
 
-          echo "[2/4] Verificando Docker Compose CLI plugin..."
-          if ! docker compose version >/dev/null 2>&1; then
-            mkdir -p /usr/local/lib/docker/cli-plugins
-            # Forzamos la descarga explícita para la arquitectura x86_64
-            curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
-            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-          fi
+          echo "[2/4] Instalando Docker Compose de forma segura..."
+          # 1. Limpiar cualquier binario corrupto o página HTML descargada previamente
+          rm -f /usr/local/lib/docker/cli-plugins/docker-compose
+          rm -f /usr/libexec/docker/cli-plugins/docker-compose
+          
+          mkdir -p /usr/local/lib/docker/cli-plugins
+          mkdir -p /usr/libexec/docker/cli-plugins
+          
+          # 2. Forzar descarga de una versión estable con flag -f para abortar si hay error HTTP
+          curl -fsSL "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+          chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          
+          # 3. Crear enlaces simbólicos en las rutas nativas de Amazon Linux 2023
+          ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+          ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
 
           if [ "__ERP_TARGET__" = "cloud" ]; then
             echo "[3/4] Desplegando Stack de ERPNext (Producción Multi-tenant)..."
